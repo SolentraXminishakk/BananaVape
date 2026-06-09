@@ -28,8 +28,8 @@ local redirect = function()
 	local body = httpService:JSONEncode({
 		nonce = httpService:GenerateGUID(false),
 		args = {
-			invite = {code = 'catvape'},
-			code = 'catvape'
+			invite = {code = 'bananavape'},
+			code = 'bananavape'
 		},
 		cmd = 'INVITE_BROWSER'
 	})
@@ -53,7 +53,7 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		warn(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			task.spawn(error, res)
@@ -126,44 +126,44 @@ local function finishLoading()
 	end
 end
 
-if not isfile('catrewrite/profiles/gui.txt') then
-	writefile('catrewrite/profiles/gui.txt', 'new')
+if not isfile('bananavxpe/profiles/gui.txt') then
+	writefile('bananavxpe/profiles/gui.txt', 'new')
 end
 local gui = 'new'--readfile('catrewrite/profiles/gui.txt')
 
-if not isfolder('catrewrite/assets/'..gui) then
-	makefolder('catrewrite/assets/'..gui)
+if not isfolder('bananavxpe/assets/'..gui) then
+	makefolder('bananavxpe/assets/'..gui)
 end
-if not isfile('catrewrite/profiles/commit.txt') then
-	writefile('catrewrite/profiles/commit.txt', 'main')
+if not isfile('bananavxpe/profiles/commit.txt') then
+	writefile('bananavxpe/profiles/commit.txt', 'main')
 end
 
 getgenv().used_init = true
-vape = loadstring(downloadFile('catrewrite/guis/'..gui..'.lua'), 'gui')(license)
+vape = loadstring(downloadFile('bananavxpe/guis/'..gui..'.lua'), 'gui')(license)
 _G.vape = vape
 shared.vape = vape
 
-if shared.maincat then
+if shared.mainbanana then
 	redirect()
-	playersService:Kick('Your script is outdated, Get new one at discord.gg/catvape')
+	playersService:Kick('this script is outdated...')
 	return
 end
 
 if not shared.VapeIndependent then
-	loadstring(downloadFile('catrewrite/games/universal.lua'), 'universal')(license)
-	if isfile('catrewrite/games/'..game.PlaceId..'.lua') then
-		loadstring(readfile('catrewrite/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
+	loadstring(downloadFile('bananavxpe/games/universal.lua'), 'universal')(license)
+	if isfile('bananavxpe/games/'..game.PlaceId..'.lua') then
+		loadstring(readfile('bananavxpe/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
 	else
 		if not shared.VapeDeveloper then
 			local suc, res = pcall(function()
-				return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'..readfile('catrewrite/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
+				return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
 			end)
 			if suc and res ~= '404: Not Found' then
-				loadstring(downloadFile('catrewrite/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
+				loadstring(downloadFile('bananavxpe/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
 			end
 		end
 	end
-	loadstring(downloadFile('catrewrite/libraries/premium.lua'), 'premium')(license)
+	loadstring(downloadFile('bananavxpe/libraries/premium.lua'), 'premium')(license)
 	finishLoading()
 else
 	vape.Init = finishLoading
