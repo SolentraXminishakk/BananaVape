@@ -53,7 +53,7 @@ local function downloadFile(path, func)
 	if not isfile(path) then
 		warn(path)
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			task.spawn(error, res)
@@ -84,7 +84,7 @@ local function finishLoading()
 			teleportedServers = true
 			local teleportScript = [[
 				if shared.VapeDeveloper then
-					loadstring(readfile('catrewrite/main.lua'), 'main')(_scriptconfig)
+					loadstring(readfile('bananavxpe/main.lua'), 'main')(_scriptconfig)
 				else
 					loadstring(game:HttpGet('https://api.catvape.dev/script?key=_key'), 'init')(_scriptconfig)
 				end
@@ -119,7 +119,7 @@ local function finishLoading()
 			vape:CreateNotification('Finished Loading', (getgenv().catname and `Authenticated as {getgenv().catname} with {getgenv().catrole}, ` or '').. (vape.VapeButton and 'Press the button in the top right' or 'Press '..table.concat(vape.Keybind, ' + '):upper())..' to open GUI', 5)
 			task.delay(1, function()
 				if shared.updated then
-					vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('catrewrite/profiles/commit.txt')}`, 10, 'info')
+					vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('bananavxpe/profiles/commit.txt')}`, 10, 'info')
 				end
 			end)
 		end
@@ -129,7 +129,7 @@ end
 if not isfile('bananavxpe/profiles/gui.txt') then
 	writefile('bananavxpe/profiles/gui.txt', 'new')
 end
-local gui = 'new'--readfile('catrewrite/profiles/gui.txt')
+local gui = 'new'--readfile('bananavxpe/profiles/gui.txt')
 
 if not isfolder('bananavxpe/assets/'..gui) then
 	makefolder('bananavxpe/assets/'..gui)
