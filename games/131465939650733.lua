@@ -16,7 +16,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'.. readfile('catrewrite/profiles/commit.txt').. '/'.. select(1, path:gsub('catrewrite/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'.. readfile('bananavxpe/profiles/commit.txt').. '/'.. select(1, path:gsub('bananavxpe/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -30,15 +30,15 @@ local function downloadFile(path, func)
 end
 
 vape.Place = 5938036553
-if isfile('catrewrite/games/' .. vape.Place .. '.lua') then
-	loadstring(readfile('catrewrite/games/' .. vape.Place .. '.lua'), tostring(vape.Place))()
+if isfile('bananavxpe/games/' .. vape.Place .. '.lua') then
+	loadstring(readfile('bananavxpe/games/' .. vape.Place .. '.lua'), tostring(vape.Place))()
 else
 	if not shared.VapeDeveloper then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'.. readfile('catrewrite/profiles/commit.txt').. '/games/'.. vape.Place.. '.lua', true)
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'.. readfile('bananavxpe/profiles/commit.txt').. '/games/'.. vape.Place.. '.lua', true)
 		end)
 		if suc and res ~= '404: Not Found' then
-			loadstring(downloadFile('catrewrite/games/' .. vape.Place .. '.lua'), tostring(vape.Place))()
+			loadstring(downloadFile('bananavxpe/games/' .. vape.Place .. '.lua'), tostring(vape.Place))()
 		end
 	end
 end
