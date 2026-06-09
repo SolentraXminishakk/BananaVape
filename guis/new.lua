@@ -273,7 +273,7 @@ local function createDownloader(text)
 			mainapi.Downloader = downloader
 		end
 		pcall(function()
-			downloader.Text = 'Downloading '..text
+			downloader.Text = 'bananavxpe is downloading: "'..text..'"'
 		end)
 	end
 end
@@ -368,7 +368,7 @@ local function loadJson(path)
 	return suc and type(res) == 'table' and res or nil
 end
 
-downloadFile('bananavxpe/profiles/features.json') -- im an idiot
+downloadFile('bananavxpe/profiles/features.json')
 local newModules = loadJson('bananavxpe/profiles/features.json') or {}
 local function makeDraggable(gui, window)
 	gui.InputBegan:Connect(function(inputObj)
