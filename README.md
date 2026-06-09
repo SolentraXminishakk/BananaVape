@@ -1,3 +1,4 @@
 > [!WARNING]
-> Original credits go to Xylex (7GrandDadPGN on GitHub) for Vape V4.
-> Development credits go to MaxlaserTech, Outer And Claude
+> Original credits go to Xylex for the actual creation of VapeV4ForRoblox.
+> Source credits go to MaxlaserTech, Outer And Claude.
+> Developmentation credits go to wintersilence.
