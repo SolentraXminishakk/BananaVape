@@ -1,1 +1,2 @@
 script_key = "KEY-HERE"; loadstring(game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/main/init.lua'), 'init.lua')({})
+-- fork of catvape, their server: discord.gg/catvape
