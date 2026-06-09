@@ -29,7 +29,7 @@ local function downloadFile(path, func)
 			downloader.Text = 'Downloading '.. path
 		end
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/CatV6/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -57,9 +57,9 @@ local function wipeFolder(path)
 end
 
 
-for _, folder in {'catrewrite', 'catrewrite/games', 'catrewrite/profiles', 'catrewrite/assets', 'catrewrite/libraries', 'catrewrite/guis'} do
+for _, folder in {'bananavxpe', 'bananavxpe/games', 'bananavxpe/profiles', 'bananavxpe/assets', 'bananavxpe/libraries', 'bananavxpe/guis'} do
 	if not isfolder(folder) then
-		downloader.Text = 'Downloading '.. folder
+		downloader.Text = 'downloading: '.. folder
 		makefolder(folder)
 	end
 end
@@ -68,23 +68,23 @@ if not shared.VapeDeveloper then
 	local commit = license.Commit or nil
 	if not commit then
 		local _, subbed = pcall(function() 
-			return game:HttpGet('https://github.com/MaxlaserTech/CatV6') 
+			return game:HttpGet('https://github.com/SolentraXminishakk/BananaVape') 
 		end)
 		commit = subbed:find('currentOid')
 		commit = commit and subbed:sub(commit + 13, commit + 52) or nil
 		commit = commit and #commit == 40 and commit or 'main'
 	end
-	if commit == 'main' or (isfile('catrewrite/profiles/commit.txt') and readfile('catrewrite/profiles/commit.txt') or '') ~= commit then
-		if commit ~= 'main' and isfile('catrewrite/profiles/commit.txt') then
-			shared.updated = readfile('catrewrite/profiles/commit.txt')
+	if commit == 'main' or (isfile('bananavxpe/profiles/commit.txt') and readfile('bananavxpe/profiles/commit.txt') or '') ~= commit then
+		if commit ~= 'main' and isfile('bananavxpe/profiles/commit.txt') then
+			shared.updated = readfile('bananavxpe/profiles/commit.txt')
 		end
-		wipeFolder('catrewrite')
-		wipeFolder('catrewrite/games')
-		wipeFolder('catrewrite/guis')
-		wipeFolder('catrewrite/libraries')
+		wipeFolder('bananavxpe')
+		wipeFolder('bananavxpe/games')
+		wipeFolder('bananavxpe/guis')
+		wipeFolder('bananavxpe/libraries')
 	end
-	writefile('catrewrite/profiles/commit.txt', commit)
+	writefile('bananavxpe/profiles/commit.txt', commit)
 end
 
 downloader.Text = ''
-return loadstring(downloadFile('catrewrite/main.lua'), 'main')(license)
+return loadstring(downloadFile('bananavxpe/main.lua'), 'main')(license)
