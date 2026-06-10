@@ -2087,7 +2087,7 @@ run(function()
                 bedwars.SwordController.isClickingTooFast = old
             end
         end,
-        Tooltip = 'Remove the CPS cap'
+        Tooltip = 'Removes the CPS Limit'
     })
 end)
 
