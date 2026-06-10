@@ -1717,7 +1717,7 @@ end))
 	end)
 end)
 
-for _, v in {'Anti Ragdoll', 'Trigger Bot', 'Silent Aim', 'Auto Rejoin', 'Rejoin', 'Disabler', 'Timer', 'Server Hop', 'Mouse TP', 'Murder Mystery'} do
+for _, v in {'Anti Ragdoll', 'Trigger Bot', 'Silent Aim', 'Anti Fall', 'Auto Rejoin', 'Rejoin', 'Disabler', 'Timer', 'Server Hop', 'Mouse TP', 'Murder Mystery'} do
 	vape:Remove(v)
 end
 
@@ -9229,7 +9229,7 @@ run(function()
     end
     
     AutoPlay = vape.Categories.Utility:CreateModule({
-        Name = 'Auto-Play',
+        Name = 'Auto-Queue',
         Function = function(callback)
             if callback then
                 AutoPlay:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
