@@ -92,43 +92,101 @@ local function downloadFile(path, func)
 end
 
 local function loadGameSpecificScript()
+	if not table.find then
+		function table.find(tbl, value)
+			for i, v in ipairs(tbl) do
+				if v == value then
+					return i
+				end
+			end
+			return nil
+		end
+	end
+	
 	local placeId = game.PlaceId
 	local gameScriptPath = 'bananavxpe/games/'..placeId..'.lua'
 	
+	local knownGames = {
+		6872274481,
+		6872265039,
+		8444591321,
+		8560631822,
+		606849621,
+		5938036553,
+		893973440,
+		142823291,
+		155615604,
+		8542259458,
+		8542275097,
+		8592115909,
+		8768229691,
+		8951451142,
+		13246639586,
+		11156779721,
+		80041634734121,
+		77790193039862,
+		123804558118054,
+		131465939650733,
+		135564683255158,
+		139566161526375,
+	}
+	
 	print("[BananaVape] Looking for game script at: " .. gameScriptPath)
-	print("[BananaVape] Current PlaceId: " .. placeId)
+	print("[BananaVape] Current GameId: " .. placeId)
+	
+	if not table.find(knownGames, placeId) then
+		print("[BananaVape] No custom script available for: " .. placeId)
+		return false, "No custom script for this game"
+	end
+	
+	local function executeScript(scriptContent, scriptName)
+		if not scriptContent or scriptContent == "" then
+			return false, "Script content is empty"
+		end
+		
+		local func, compileError = loadstring(scriptContent, scriptName)
+		if not func then
+			return false, "Compile error: " .. tostring(compileError)
+		end
+		
+		local methods = {
+			{name = "No arguments", fn = function() return pcall(func) end},
+			{name = "With license", fn = function() return pcall(function() return func(license) end) end},
+			{name = "License as arg", fn = function() return pcall(func, license) end},
+			{name = "With environment", fn = function() 
+				local env = { license = license, shared = shared, vape = vape, _G = _G }
+				setfenv(func, env)
+				return pcall(func)
+			end},
+			{name = "Auto-execute", fn = function()
+				return pcall(function()
+					local chunk = loadstring(scriptContent, scriptName)
+					if chunk then chunk() end
+					return true
+				end)
+			end}
+		}
+		
+		for _, method in ipairs(methods) do
+			local success, result = method.fn()
+			if success then
+				print("[BananaVape] Script executed successfully")
+				return true, result
+			end
+		end
+		
+		return false, "All execution methods failed"
+	end
 	
 	if isfile(gameScriptPath) then
 		print("[BananaVape] Found local game script, loading...")
 		local scriptContent = readfile(gameScriptPath)
-		if scriptContent then
-			local success, result = pcall(function()
-				local func = loadstring(scriptContent, tostring(placeId))
-				if func then
-					local success1, result1 = pcall(func)
-					if success1 then
-						return true, result1
-					else
-						local success2, result2 = pcall(func, license)
-						if success2 then
-							return true, result2
-						else
-							local success3, result3 = pcall(function() return func(license) end)
-							if success3 then
-								return true, result3
-							end
-						end
-						return nil, result1 or result2 or result3
-					end
-				end
-				return nil, "loadstring returned nil"
-			end)
-			if success and result then
-				print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
-				return true, "Loaded local game script"
-			else
-				warn("Failed to load local game script: " .. tostring(result))
-			end
+		local success, result = executeScript(scriptContent, tostring(placeId))
+		if success then
+			print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
+			return true, "Loaded local game script"
+		else
+			warn("Failed to load local game script: " .. tostring(result))
 		end
 	end
 	
@@ -142,37 +200,15 @@ local function loadGameSpecificScript()
 			return game:HttpGet(url, true)
 		end)
 		
-		if suc and res and res ~= '404: Not Found' then
+		if suc and res and res ~= '404: Not Found' and res ~= '' then
 			print("[BananaVape] Downloaded game script, saving and loading...")
-			if res:find('.lua') then
+			
+			if not res:find('This watermark is used to delete the file') then
 				res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 			end
 			writefile(gameScriptPath, res)
 			
-			local success, result = pcall(function()
-				local func = loadstring(res, tostring(placeId))
-				if func then
-					local callSuccess, callResult
-					
-					callSuccess, callResult = pcall(func)
-					if callSuccess then
-						return true, callResult
-					end
-					
-					callSuccess, callResult = pcall(function() return func(license) end)
-					if callSuccess then
-						return true, callResult
-					end
-					
-					callSuccess, callResult = pcall(func, license)
-					if callSuccess then
-						return true, callResult
-					end
-					
-					return nil, "All calling methods failed for downloaded script"
-				end
-				return nil, "loadstring returned nil for downloaded script"
-			end)
+			local success, result = executeScript(res, tostring(placeId))
 			if success then
 				print("[BananaVape] Successfully loaded downloaded game script for PlaceId: " .. placeId)
 				return true, "Downloaded and loaded game script"
@@ -182,12 +218,12 @@ local function loadGameSpecificScript()
 		else
 			print("[BananaVape] Game script not found on GitHub for PlaceId: " .. placeId)
 			if res == '404: Not Found' then
-				print("[BananaVape] No custom module exists for this game")
+				print("[BananaVape] No custom module exists for this game yet")
 			end
 		end
 	end
 	
-	print("[BananaVape] No game-specific script found for PlaceId: " .. placeId)
+	print("[BananaVape] No game-specific script found for: " .. placeId)
 	return false, "No game-specific script found"
 end
 
@@ -221,17 +257,17 @@ local function initialize()
 	
 	local guiContent = downloadFile('bananavxpe/guis/'..gui..'.lua')
 	if not guiContent then
-		error("Failed to load GUI file - download returned nil")
+		error("Failed to load GUI file (download returned nil)")
 	end
 	
 	local loadFunc = loadstring(guiContent, 'gui')
 	if not loadFunc then
-		error("Failed to compile GUI file - syntax error")
+		error("Failed to compile GUI file (syntax error)")
 	end
 	
 	vape = loadFunc(license)
 	if not vape then
-		error("Failed to initialize vape - GUI returned nil")
+		error("Failed to initialize vape (GUI returned nil)")
 	end
 	
 	_G.vape = vape
@@ -239,7 +275,7 @@ local function initialize()
 
 	if shared.mainbanana then
 		redirect()
-		playersService:Kick('this script is outdated...')
+		playersService:Kick('this script is outdated...\n\n\nfucking dumbass lol')
 		return
 	end
 
