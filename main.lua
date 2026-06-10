@@ -54,24 +54,41 @@ local redirect = function()
 end
 
 local function downloadFile(path, func)
-	if not isfile(path) then
-		warn("Downloading: " .. path)
-		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
-		end)
-		if not suc or res == '404: Not Found' then
-			warn("Failed to download: " .. path .. " - " .. tostring(res))
-			return nil
-		end
-		if suc then
-			if path:find('.lua') then
-				res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
-			end
-			writefile(path, res)
-			print("Downloaded: " .. path)
-		end
+	if isfile(path) then
+		return (func or readfile)(path)
 	end
-	return (func or readfile)(path)
+	
+	warn("Downloading: " .. path)
+	local commitFile = 'bananavxpe/profiles/commit.txt'
+	
+	if not isfile(commitFile) then
+		warn("commit.txt not found, creating default")
+		writefile(commitFile, 'main')
+	end
+	
+	local commit = readfile(commitFile)
+	local relativePath = select(1, path:gsub('bananavxpe/', ''))
+	local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/'..relativePath
+	
+	local suc, res = pcall(function()
+		return game:HttpGet(url, true)
+	end)
+	
+	if not suc or res == '404: Not Found' then
+		warn("Failed to download: " .. path .. " - " .. tostring(res))
+		return nil
+	end
+	
+	if suc and res then
+		if path:find('.lua') then
+			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
+		end
+		writefile(path, res)
+		print("Downloaded: " .. path)
+		return (func or readfile)(path)
+	end
+	
+	return nil
 end
 
 local function loadGameSpecificScript()
@@ -83,22 +100,27 @@ local function loadGameSpecificScript()
 	
 	if isfile(gameScriptPath) then
 		print("[BananaVape] Found local game script, loading...")
-		local success, result = pcall(function()
-			local scriptContent = readfile(gameScriptPath)
-			local func = loadstring(scriptContent, tostring(placeId))
-			return func(license)
-		end)
-		if success then
-			print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
-			return true, "Loaded local game script"
-		else
-			warn("Failed to load local game script: " .. tostring(result))
+		local scriptContent = readfile(gameScriptPath)
+		if scriptContent then
+			local success, result = pcall(function()
+				local func = loadstring(scriptContent, tostring(placeId))
+				if func then
+					return func(license)
+				end
+				return nil
+			end)
+			if success then
+				print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
+				return true, "Loaded local game script"
+			else
+				warn("Failed to load local game script: " .. tostring(result))
+			end
 		end
 	end
 	
 	if not shared.VapeDeveloper then
 		print("[BananaVape] Attempting to download game script from GitHub...")
-		local commit = readfile('bananavxpe/profiles/commit.txt')
+		local commit = isfile('bananavxpe/profiles/commit.txt') and readfile('bananavxpe/profiles/commit.txt') or 'main'
 		local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
 		print("[BananaVape] Download URL: " .. url)
 		
@@ -108,14 +130,17 @@ local function loadGameSpecificScript()
 		
 		if suc and res and res ~= '404: Not Found' then
 			print("[BananaVape] Downloaded game script, saving and loading...")
-			if path:find('.lua') then
+			if res:find('.lua') then
 				res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 			end
 			writefile(gameScriptPath, res)
 			
 			local success, result = pcall(function()
 				local func = loadstring(res, tostring(placeId))
-				return func(license)
+				if func then
+					return func(license)
+				end
+				return nil
 			end)
 			if success then
 				print("[BananaVape] Successfully loaded downloaded game script for PlaceId: " .. placeId)
@@ -136,14 +161,21 @@ local function loadGameSpecificScript()
 end
 
 local function finishLoading()
+	if not vape then
+		warn("finishLoading called but vape is nil")
+		return
+	end
+	
 	vape.Init = nil
 	vape:Load()
 	
 	task.spawn(function()
 		repeat
-			vape:Save()
 			task.wait(10)
-		until not vape.Loaded
+			if vape and vape.Save then
+				pcall(function() vape:Save() end)
+			end
+		until not vape or not vape.Loaded
 	end)
 
 	local teleportedServers
@@ -175,47 +207,47 @@ local function finishLoading()
 	end))
 
 	if not shared.vapereload then
-		if not vape.Categories then return end
-		if vape.Categories.Main and vape.Categories.Main.Options['GUI bind indicator'] and vape.Categories.Main.Options['GUI bind indicator'].Enabled then
-			if getgenv().catrole == 'HWID MISMATCH' then
-				vape:CreateNotification('Cat', 'HWID MISMATCH, Go to the script panel to reset hwid', 25, 'alert')
-				getgenv().catrole = ''
-				task.wait(0.1)
-			end
-			
-			if vape.Place ~= 6872274481 and not license.Closet then
-				task.spawn(redirect)
-			end
-			
-			local authMessage = (getgenv().catname and `Authenticated as {getgenv().catname} with {getgenv().catrole}, ` or '')
-			local guiMessage = (vape.VapeButton and 'Press the button in the top right' or 'Press '..table.concat(vape.Keybind, ' + '):upper())..' to open GUI'
-			
-			vape:CreateNotification('Finished Loading', authMessage..guiMessage, 5)
-			
-			task.delay(1, function()
-				if shared.updated then
-					vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('bananavxpe/profiles/commit.txt')}`, 10, 'info')
+		if vape and vape.Categories then
+			if vape.Categories.Main and vape.Categories.Main.Options['GUI bind indicator'] and vape.Categories.Main.Options['GUI bind indicator'].Enabled then
+				if getgenv().catrole == 'HWID MISMATCH' then
+					vape:CreateNotification('Cat', 'HWID MISMATCH, Go to the script panel to reset hwid', 25, 'alert')
+					getgenv().catrole = ''
+					task.wait(0.1)
 				end
-			end)
+				
+				if vape.Place ~= 6872274481 and not license.Closet then
+					task.spawn(redirect)
+				end
+				
+				local authMessage = (getgenv().catname and `Authenticated as {getgenv().catname} with {getgenv().catrole}, ` or '')
+				local guiMessage = (vape.VapeButton and 'Press the button in the top right' or 'Press '..table.concat(vape.Keybind, ' + '):upper())..' to open GUI'
+				
+				vape:CreateNotification('Finished Loading', authMessage..guiMessage, 5)
+				
+				task.delay(1, function()
+					if shared.updated then
+						vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('bananavxpe/profiles/commit.txt')}`, 10, 'info')
+					end
+				end)
+			end
 		end
 	end
 end
 
 local function initialize()
-	if not isfolder('bananavxpe') then
-		makefolder('bananavxpe')
-	end
-	if not isfolder('bananavxpe/profiles') then
-		makefolder('bananavxpe/profiles')
-	end
-	if not isfolder('bananavxpe/games') then
-		makefolder('bananavxpe/games')
-	end
-	if not isfolder('bananavxpe/libraries') then
-		makefolder('bananavxpe/libraries')
-	end
-	if not isfolder('bananavxpe/guis') then
-		makefolder('bananavxpe/guis')
+	local folders = {
+		'bananavxpe',
+		'bananavxpe/profiles',
+		'bananavxpe/games',
+		'bananavxpe/libraries',
+		'bananavxpe/guis',
+		'bananavxpe/assets/new'
+	}
+	
+	for _, folder in ipairs(folders) do
+		if not isfolder(folder) then
+			makefolder(folder)
+		end
 	end
 	
 	if not isfile('bananavxpe/profiles/gui.txt') then
@@ -223,10 +255,6 @@ local function initialize()
 	end
 	
 	local gui = 'new'
-
-	if not isfolder('bananavxpe/assets/'..gui) then
-		makefolder('bananavxpe/assets/'..gui)
-	end
 	
 	if not isfile('bananavxpe/profiles/commit.txt') then
 		writefile('bananavxpe/profiles/commit.txt', 'main')
@@ -236,10 +264,19 @@ local function initialize()
 	
 	local guiContent = downloadFile('bananavxpe/guis/'..gui..'.lua')
 	if not guiContent then
-		error("Failed to load GUI file")
+		error("Failed to load GUI file - download returned nil")
 	end
 	
-	vape = loadstring(guiContent, 'gui')(license)
+	local loadFunc = loadstring(guiContent, 'gui')
+	if not loadFunc then
+		error("Failed to compile GUI file - syntax error")
+	end
+	
+	vape = loadFunc(license)
+	if not vape then
+		error("Failed to initialize vape - GUI returned nil")
+	end
+	
 	_G.vape = vape
 	shared.vape = vape
 
@@ -252,13 +289,16 @@ local function initialize()
 	if not shared.VapeIndependent then
 		local universalContent = downloadFile('bananavxpe/games/universal.lua')
 		if universalContent then
-			local success = pcall(function()
-				loadstring(universalContent, 'universal')(license)
-			end)
-			if not success then
-				warn("Failed to load universal.lua")
-			else
-				print("[Vape] Universal.lua loaded successfully")
+			local universalFunc = loadstring(universalContent, 'universal')
+			if universalFunc then
+				local success = pcall(function()
+					universalFunc(license)
+				end)
+				if not success then
+					warn("Failed to load universal.lua")
+				else
+					print("[BananaVape] Universal.lua loaded successfully")
+				end
 			end
 		else
 			warn("Failed to download universal.lua")
@@ -268,19 +308,20 @@ local function initialize()
 		
 		if gameScriptLoaded then
 			print("[BananaVape] SUCCESS: " .. gameScriptMessage)
-			print("[BananaVape] Custom modules for PlaceId " .. game.PlaceId .. " should now be loaded")
 		else
 			print("[BananaVape] WARNING: " .. gameScriptMessage)
-			print("[BananaVape] No custom modules found for this game. Only universal features will work.")
 		end
 		
 		local premiumContent = downloadFile('bananavxpe/libraries/premium.lua')
 		if premiumContent then
-			local success = pcall(function()
-				loadstring(premiumContent, 'premium')(license)
-			end)
-			if not success then
-				warn("Failed to load premium.lua")
+			local premiumFunc = loadstring(premiumContent, 'premium')
+			if premiumFunc then
+				local success = pcall(function()
+					premiumFunc(license)
+				end)
+				if not success then
+					warn("Failed to load premium.lua")
+				end
 			end
 		end
 		
@@ -291,14 +332,12 @@ local function initialize()
 	end
 end
 
-local success, err = xpcall(initialize, function(err)
-	warn("Initialization error: " .. tostring(err))
+local success, err = xpcall(initialize, function(e)
+	warn("Initialization error: " .. tostring(e))
 	warn(debug.traceback())
-	if vape and vape.CreateNotification then
-		vape:CreateNotification('Error', 'Failed to initialize: ' .. tostring(err), 10, 'alert')
-	end
+	return e
 end)
 
 if not success then
-	error("Script failed to initialize: " .. tostring(err))
+	error("Script failed to initialize: " .. tostring(err or "Unknown error"))
 end
