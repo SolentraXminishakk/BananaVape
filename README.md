@@ -1,4 +1,4 @@
-> [!WARNING]
-> Original credits go to Xylex for the actual creation of VapeV4ForRoblox.
-> Source credits go to MaxlaserTech, Outer And Claude.
-> Developmentation credits go to wintersilence.
+## CREDITS:
+- Xylex (7GrandDadPGN) | Original VapeV4ForRoblox Developer.
+- MaxlaserTech, Outer And Claude | CatVape creators.
+- Wintersilence (gameover_loserLOL) | BananaVape Developer.
