@@ -26,7 +26,7 @@ downloader.Parent = Instance.new('ScreenGui', gethui and gethui() or cloneref(ga
 local function downloadFile(path, func)
 	if not isfile(path) then
 		if not license.Closet then
-			downloader.Text = 'Downloading '.. path
+			downloader.Text = 'bananavxpe is downloading: "'.. path .. '"'
 		end
 		local suc, res = pcall(function()
 			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
