@@ -1372,73 +1372,188 @@ run(function()
 		end
 	end)
 
-	local kills = sessioninfo:AddItem('Kills')
-	local beds = sessioninfo:AddItem('Beds')
-	local wins = sessioninfo:AddItem('Wins')
-	local games = sessioninfo:AddItem('Games')
+local global_time = sessioninfo:AddItem('Time')
+local kills = sessioninfo:AddItem('Kills')
+local beds = sessioninfo:AddItem('Beds')
+local wins = sessioninfo:AddItem('Wins')
+local games = sessioninfo:AddItem('Games')
+local universal_lagbacks = sessioninfo:AddItem('Universal Lagbacks')
+local lagbacks = sessioninfo:AddItem('Lagbacks')
 
-	local mapname = 'Unknown'
-	sessioninfo:AddItem('Map', 0, function()
-		return mapname
-	end, false)
+local mapname = 'Unknown'
+sessioninfo:AddItem('Map', 0, function()
+	return mapname
+end, false)
 
-	task.delay(1, function()
-		games:Increment()
-	end)
+task.spawn(function()
+	while true do
+		local currentTime = os.date("%H:%M:%S")
+		global_time.Value = currentTime
+		task.wait(1)
+	end
+end)
 
-	task.spawn(function()
-		pcall(function()
-			repeat task.wait() until store.matchState ~= 0 or vape.Loaded == nil
-			if vape.Loaded == nil then return end
-			store.map = waitForChildYield(workspace, 9e9, 'Map', 'Worlds'):GetChildren()[1]
-			mapname = store.map.Name
-			mapname = string.gsub(string.split(mapname, '_')[2] or mapname, '-', '') or 'Blank'
-			if store.map then
-				vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v) -- bedwars game is so bad bro 😭 how did you even break this event
-					task.delay(0, function()
-						if v:GetAttribute('Block') and (v:GetAttribute('PlacedByUserId') or 0) ~= 0 then
-							local data = {
-								blockRef = {
-									blockPosition = v.Position / 3,
-								},
-								player = playersService:GetPlayerByUserId(v:GetAttribute('PlacedByUserId')),
-							}
-							for i, v in cache do
-								if ((data.blockRef.blockPosition * 3) - v[1]).Magnitude <= 30 then
-									table.clear(v[3])
-									table.clear(v)
-									cache[i] = nil
-								end
-							end
-							vapeEvents.PlaceBlockEvent:Fire(data)
+local universalLagbackCount = 0
+universal_lagbacks.Value = 0
+
+local function setupUniversalLagbackDetection()
+	local lastPosition = {}
+	local lastTimestamp = {}
+	
+	local originalReject = nil
+	if game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents") then
+		game:GetService("RunService").Heartbeat:Connect(function()
+			for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+					local rootPart = player.Character.HumanoidRootPart
+					local currentPos = rootPart.Position
+					local playerId = player.UserId
+					
+					if lastPosition[playerId] then
+						local distance = (currentPos - lastPosition[playerId]).Magnitude
+						local timeDiff = tick() - (lastTimestamp[playerId] or tick())
+						
+						if distance > 50 and timeDiff < 0.5 then
+							universalLagbackCount = universalLagbackCount + 1
+							universal_lagbacks.Value = universalLagbackCount
+							print(`[Universal Lagback] Detected on {player.Name}: {distance} studs in {timeDiff}s`)
 						end
-					end)
-				end))
+					end
+					
+					lastPosition[playerId] = currentPos
+					lastTimestamp[playerId] = tick()
+				end
 			end
 		end)
+	end
+end
+
+local function detectUniversalLagbacks()
+	setupUniversalLagbackDetection()
+	
+	game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(character)
+		task.wait(0.5)
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if rootPart then
+			task.delay(0.1, function()
+				if rootPart.Position.Y < 0 then
+					universalLagbackCount = universalLagbackCount + 1
+					universal_lagbacks.Value = universalLagbackCount
+					print("[Universal Lagback] Detected respawn from void (possible anticheat flag)")
+				end
+			end)
+		end
 	end)
+end
+local bedwarsLagbackCount = 0
+lagbacks.Value = 0
 
-	vape:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
-		if bedTable.player and bedTable.player.UserId == lplr.UserId then
-			beds:Increment()
+local function detectBedwarsLagbacks()
+	local lastPosition = nil
+	local lastTick = tick()
+	
+	game:GetService("RunService").Stepped:Connect(function()
+		local lplr = game:GetService("Players").LocalPlayer
+		if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+			local currentPos = lplr.Character.HumanoidRootPart.Position
+			
+			if lastPosition then
+				local distance = (currentPos - lastPosition).Magnitude
+				local timeDiff = tick() - lastTick
+				
+				if distance < -5 and timeDiff < 0.3 then
+					bedwarsLagbackCount = bedwarsLagbackCount + 1
+					lagbacks.Value = bedwarsLagbackCount
+					print(`[Bedwars Lagback] Detected: Position changed by {distance} studs`)
+				end
+			end
+			
+			lastPosition = currentPos
+			lastTick = tick()
 		end
-	end))
-
-	vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
-		if (bedwars.Store:getState().Game.myTeam or {}).id == winTable.winningTeamId or lplr.Neutral then
-			wins:Increment()
+	end)
+	
+	local lastVelocity = nil
+	task.spawn(function()
+		while true do
+			local lplr = game:GetService("Players").LocalPlayer
+			if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+				local currentVelocity = lplr.Character.HumanoidRootPart.AssemblyLinearVelocity
+				
+				if lastVelocity and lastVelocity.Magnitude > 30 and currentVelocity.Magnitude < 5 then
+					bedwarsLagbackCount = bedwarsLagbackCount + 1
+					lagbacks.Value = bedwarsLagbackCount
+					print(`[Bedwars Lagback] Velocity reset detected: {lastVelocity.Magnitude} → {currentVelocity.Magnitude}`)
+				end
+				
+				lastVelocity = currentVelocity
+			end
+			task.wait(0.2)
 		end
-	end))
+	end)
+end
 
-	vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
-		local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
-		local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
-		if not killed or not killer then return end
+task.delay(1, function()
+	games:Increment()
+end)
 
-		if killed ~= lplr and killer == lplr then
-			kills:Increment()
+-- Start detection functions
+detectUniversalLagbacks()
+detectBedwarsLagbacks()
+
+task.spawn(function()
+	pcall(function()
+		repeat task.wait() until store.matchState ~= 0 or vape.Loaded == nil
+		if vape.Loaded == nil then return end
+		store.map = waitForChildYield(workspace, 9e9, 'Map', 'Worlds'):GetChildren()[1]
+		mapname = store.map.Name
+		mapname = string.gsub(string.split(mapname, '_')[2] or mapname, '-', '') or 'Blank'
+		if store.map then
+			vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v) -- bedwars game is so bad bro 😭 how did you even break this event
+				task.delay(0, function()
+					if v:GetAttribute('Block') and (v:GetAttribute('PlacedByUserId') or 0) ~= 0 then
+						local data = {
+							blockRef = {
+								blockPosition = v.Position / 3,
+							},
+							player = playersService:GetPlayerByUserId(v:GetAttribute('PlacedByUserId')),
+						}
+						for i, v in cache do
+							if ((data.blockRef.blockPosition * 3) - v[1]).Magnitude <= 30 then
+								table.clear(v[3])
+								table.clear(v)
+								cache[i] = nil
+							end
+						end
+						vapeEvents.PlaceBlockEvent:Fire(data)
+					end
+				end)
+			end))
 		end
-	end))
+	end)
+end)
+
+vape:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
+	if bedTable.player and bedTable.player.UserId == lplr.UserId then
+		beds:Increment()
+	end
+end))
+
+vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
+	if (bedwars.Store:getState().Game.myTeam or {}).id == winTable.winningTeamId or lplr.Neutral then
+		wins:Increment()
+	end
+end))
+
+vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
+	local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
+	local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
+	if not killed or not killer then return end
+
+	if killed ~= lplr and killer == lplr then
+		kills:Increment()
+	end
+end))
 
 	task.spawn(function()
 		local rayParams = RaycastParams.new()
