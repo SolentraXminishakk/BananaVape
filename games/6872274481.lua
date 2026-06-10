@@ -1854,7 +1854,7 @@ run(function()
     			end
     		end
     	end,
-    	Tooltip = 'Hold attack button to automatically click',
+    	Tooltip = 'Hold MB1 to automatically click in the specified range.',
     })
     CPS = AutoClicker:CreateTwoSlider({
     	Name = 'CPS',
@@ -1943,7 +1943,7 @@ run(function()
     local rayCheck = RaycastParams.new()
     
     BowAssist = vape.Categories.Combat:CreateModule({
-    	Name = 'Bow Assist',
+    	Name = 'Bow Aim',
     	Function = function(callback)
     		if callback then
     			local multi, predicted = 0, nil
@@ -2000,7 +2000,7 @@ run(function()
     			end
     		end
     	end,
-        Tooltip = 'Smoothly aims your projectile trajectory to the target'
+        Tooltip = 'Aims your trajectory arrow toward the target.'
     })
     
     Targets = BowAssist:CreateTargets({
@@ -2105,7 +2105,7 @@ run(function()
     
     		Reach = vape.Categories.Combat:CreateModule({
     			Name = 'Reach',
-    			Tooltip = 'Allows you to place, attack, and break further',
+    			Tooltip = 'Allows you to place, attack, and break further with extra reach.',
     			Function = function(callback)
     				bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = callback and SwordReach.Enabled and SwordRange.Value + 2 or 14.4
     				if callback then
@@ -2486,7 +2486,7 @@ run(function()
                 box.Adornee = nil
             end
         end,
-        Tooltip = 'Automatically aims and attacks nearby target',
+        Tooltip = 'Automatically aims and attacks a nearby target',
     })
     
     Targets = SilentAura:CreateTargets({
@@ -2558,7 +2558,7 @@ run(function()
     LegitAura = SilentAura:CreateToggle({Name = 'Swing only'})
     SilentAim = SilentAura:CreateToggle({
         Name = 'Silent Aim',
-        Tooltip = 'Uses catvape\'s aiming technology to silently aim while looking legit',
+        Tooltip = 'Uses catvape/bananavape\'s aim functionallity to silently aim while looking legit',
         Default = true,
         Function = function(callback)
             Area.Object.Visible = not callback
@@ -2867,7 +2867,7 @@ run(function()
     local Paused, Activated = 0, 0
     
     AntiDeath = vape.Categories.Blatant:CreateModule({
-        Name = 'Anti Death',
+        Name = 'Anti-Death',
         Function = function(call)
             if call then
                 local FloatTime = tick();
@@ -2982,7 +2982,7 @@ run(function()
     end
     
     AntiFall = vape.Categories.Blatant:CreateModule({
-        Name = 'Anti Fall',
+        Name = 'Anti-Fall',
         Function = function(callback)
             if callback then
                 repeat task.wait() until store.matchState ~= 0 or (not AntiFall.Enabled)
@@ -3159,8 +3159,8 @@ run(function()
     end
     
     AutoDodge = vape.Categories.Blatant:CreateModule({
-    	Name = 'Auto Dodge',
-    	Tooltip = 'Dodges melee and projectiles "blatantly"',
+    	Name = 'Auto-Dodge',
+    	Tooltip = 'Dodges melee\'s and projectiles "blatantly"',
     	Function = function(call)
     		if call then
     			repeat
@@ -3171,7 +3171,7 @@ run(function()
     			end
     
     			rayParams.FilterDescendantsInstances = {store.map}
-    			local lowestpoint = 9e9
+    			local lowestpoint = 1e20
     			local Dodge = 0
     			for _, v in store.blocks do
     				local point = (v.Position.Y - (v.Size.Y / 2)) - 50
@@ -5002,7 +5002,7 @@ run(function()
     local old
     
     vape.Categories.Blatant:CreateModule({
-        Name = 'No Slow',
+        Name = 'NoSlowdown',
         Function = function(callback)
             local modifier = bedwars.SprintController:getMovementStatusModifier()
             if callback then
@@ -5358,171 +5358,245 @@ end)
 
 run(function()
     local ProjectileAura
+    
     local FireRate
     local Targets
     local Range
     local Sort
-    local List
+    local ProjectileList
+    
     local rayCheck = RaycastParams.new()
     rayCheck.FilterType = Enum.RaycastFilterType.Include
+    
     local projectileRemote = { InvokeServer = function(self, ...) end }
     local projectileCooldown = 0
-    local FireDelays = {}
+    local fireDelays = {}
+    
     task.spawn(function()
-    	projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
+        projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
     end)
     
-    local function getAmmo(check)
-    	for _, item in store.inventory.inventory.items do
-    		if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
-    			return item.itemType
-    		end
-    	end
-    	return nil
+    local function findAmmoItem(projectileConfig)
+        for _, inventoryItem in store.inventory.inventory.items do
+            if projectileConfig.ammoItemTypes and table.find(projectileConfig.ammoItemTypes, inventoryItem.itemType) then
+                return inventoryItem.itemType
+            end
+        end
+        return nil
     end
-    local function getProjectiles()
-    	local items = {}
-    	for _, item in store.inventory.inventory.items do
-    		local proj = bedwars.ItemMeta[item.itemType].projectileSource
-    		local ammo = proj and getAmmo(proj)
-    		if ammo and table.find(List.ListEnabled, ammo) then
-    			table.insert(items, {
-    				item,
-    				ammo,
-    				proj.projectileType(ammo),
-    				proj,
-    			})
-    		end
-    	end
-    	return items
+    
+    local function getValidProjectiles()
+        local validProjectiles = {}
+        
+        for _, inventoryItem in store.inventory.inventory.items do
+            local projectileSource = bedwars.ItemMeta[inventoryItem.itemType].projectileSource
+            local ammoItem = projectileSource and findAmmoItem(projectileSource)
+            
+            if ammoItem and table.find(ProjectileList.ListEnabled, ammoItem) then
+                table.insert(validProjectiles, {
+                    item = inventoryItem,
+                    ammo = ammoItem,
+                    projectileType = projectileSource.projectileType(ammoItem),
+                    projectileMeta = projectileSource,
+                })
+            end
+        end
+        
+        return validProjectiles
+    end
+    
+    local function getNearestTarget()
+        return entitylib.EntityPosition({
+            Part = 'RootPart',
+            Range = Range.Value,
+            Sort = sortmethods[Sort.Value],
+            Players = Targets.Players.Enabled,
+            NPCs = Targets.NPCs.Enabled,
+            Wallcheck = Targets.Walls.Enabled,
+        })
+    end
+    
+    local function calculateTrajectory(shootPosition, targetData, projectileSpeed, gravity)
+        local targetPosition = targetData.RootPart.Position + (targetData.Humanoid.MoveDirection or Vector3.zero)
+        local targetVelocity = targetData.RootPart.Velocity
+        local hipHeight = targetData.HipHeight + 2
+        local jumpVelocity = targetData.Jumping and 42.6 or nil
+        
+        return prediction.SolveTrajectory(
+            shootPosition, projectileSpeed, gravity,
+            targetPosition, targetVelocity,
+            workspace.Gravity, hipHeight, jumpVelocity, rayCheck
+        )
+    end
+    
+    local function fireProjectileWithLagCompensation(itemData, shootPosition, targetData, projectileSpeed, gravity)
+        local playerPosition = entitylib.character.RootPart.Position
+        local ping = math.min(lplr:GetNetworkPing(), 0.5)
+        
+        local compensatedTargetPosition = targetData.RootPart.Position
+        if ping > 0.06 then
+            compensatedTargetPosition = compensatedTargetPosition + (targetData.RootPart.AssemblyLinearVelocity * ping)
+        end
+        
+        local compensatedTrajectory = calculateTrajectory(
+            playerPosition, targetData, projectileSpeed, gravity
+        )
+        
+        if not compensatedTrajectory then
+            return false
+        end
+        
+        task.spawn(function()
+            local shootDirection = CFrame.lookAt(playerPosition, compensatedTrajectory).LookVector
+            local shotId = httpService:GenerateGUID(true)
+            
+            local shootPositionCompensated = (CFrame.new(playerPosition, compensatedTrajectory) * 
+                CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, 
+                                       -bedwars.BowConstantsTable.RelY, 
+                                       -bedwars.BowConstantsTable.RelZ))).Position
+            
+            projectileCooldown = 9e9
+            
+            local success, result = pcall(function()
+                return projectileRemote:InvokeServer(
+                    itemData.item.tool,
+                    itemData.ammo,
+                    itemData.projectileType,
+                    shootPositionCompensated,
+                    playerPosition,
+                    shootDirection * projectileSpeed,
+                    shotId,
+                    { 
+                        drawDurationSeconds = 1, 
+                        shotId = httpService:GenerateGUID(false) 
+                    },
+                    workspace:GetServerTimeNow() - 0.045
+                )
+            end)
+            
+            projectileCooldown = tick()
+            
+            if success and result then
+                local launchSound = itemData.projectileMeta.launchSound
+                if launchSound then
+                    local selectedSound = launchSound[math.random(1, #launchSound)]
+                    if selectedSound then
+                        bedwars.SoundManager:playSound(selectedSound)
+                    end
+                end
+            else
+                fireDelays[itemData.item.itemType] = tick()
+            end
+        end)
+        
+        return true
+    end
+    
+    local function equipAndFire(itemData, targetData)
+        local wasSwitched = switchItem(itemData.item.tool)
+        
+        if wasSwitched then
+            repeat task.wait() until tick() > projectileCooldown
+            if FireRate.Value > 0 then
+                task.wait(FireRate.Value)
+            end
+        end
     end
     
     ProjectileAura = vape.Categories.Blatant:CreateModule({
-    	Name = 'Projectile Aura',
-    	Function = function(callback)
-    		if callback then
-    			repeat
-    				if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
-    					local ent = entitylib.EntityPosition({
-    						Part = 'RootPart',
-    						Range = Range.Value,
-    						Sort = sortmethods[Sort.Value],
-    						Players = Targets.Players.Enabled,
-    						NPCs = Targets.NPCs.Enabled,
-    						Wallcheck = Targets.Walls.Enabled,
-    					})
-    
-    					if ent then
-    						local pos = entitylib.character.RootPart.Position
-    						for _, data in getProjectiles() do
-    							local item, ammo, projectile, itemMeta = unpack(data)
-    							if (FireDelays[item.itemType] or 0) < tick() then
-    								rayCheck.FilterDescendantsInstances = { workspace.Map }
-    								local meta = bedwars.ProjectileMeta[projectile]
-    								local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
-    								local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position + (ent.Humanoid.MoveDirection or Vector3.zero), ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight + 2, ent.Jumping and 42.6 or nil, rayCheck)
-    								if calc then
-    									targetinfo.Targets[ent] = tick() + 1
-    									local switched = switchItem(item.tool)
-    
-    									local v = ent.RootPart.AssemblyLinearVelocity
-    									local s = v:Lerp(ent.RootPart.AssemblyLinearVelocity, 0.5)
-    									pos = entitylib.character.RootPart.Position
-    									local ps = math.min(lplr:GetNetworkPing(), 0.5)
-    									local tpos = ent.RootPart.Position
-    									if ps > 0.06 then
-    										tpos = tpos + (v * ps)
-    									end
-    									calc = prediction.SolveTrajectory(pos, projSpeed, gravity, tpos, s, workspace.Gravity, ent.HipHeight + 2, ent.Jumping and 42.6 or nil, rayCheck)
-    									if not calc then
-                                            task.wait()
-    										continue
-    									end
-    									task.spawn(function()
-    										local dir, id =
-    											CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
-    										local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
-    										projectileCooldown = 9e9
-    										local _, res = pcall(function() return projectileRemote:InvokeServer(
-    											item.tool,
-    											ammo,
-    											projectile,
-    											shootPosition,
-    											pos,
-    											dir * projSpeed,
-    											id,
-    											{ 
-                                                    drawDurationSeconds = 1, 
-                                                    shotId = httpService:GenerateGUID(false) 
-                                                },
-    											workspace:GetServerTimeNow() - 0.045
-    										) end)
-    										projectileCooldown = tick()
-    										if not res then
-    											FireDelays[item.itemType] = tick()
-    										else
-    											--res.Parent = replicatedStorage
-    											local shoot = itemMeta.launchSound
-    											shoot = shoot and shoot[math.random(1, #shoot)] or nil
-    											if shoot then
-    												bedwars.SoundManager:playSound(shoot)
-    											end
-    										end
-    									end)
-    
-    									FireDelays[item.itemType] = tick() + itemMeta.fireDelaySec
-    									if switched then
-    										repeat task.wait() until tick() > projectileCooldown
-    										if FireRate.Value > 0 then
-    											task.wait(FireRate.Value)
-    										end
-    									end
-    								end
-    							end
-    						end
-    					end
-    				end
-    				task.wait(0.012)
-    			until not ProjectileAura.Enabled
-    		end
-    	end,
-    	Tooltip = 'Shoots people around you',
+        Name = 'Projectile Aura',
+        Tooltip = 'Automatically shoots projectiles at nearby enemies',
+        Function = function(callback)
+            if not callback then return end
+            
+            repeat
+                local timeSinceLastAttack = workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack
+                
+                if timeSinceLastAttack > 0.5 then
+                    local target = getNearestTarget()
+                    
+                    if target then
+                        local playerPosition = entitylib.character.RootPart.Position
+                        local validProjectiles = getValidProjectiles()
+                        
+                        for _, projectileData in validProjectiles do
+                            local itemType = projectileData.item.itemType
+                            local nextFireTime = fireDelays[itemType] or 0
+                            
+                            if nextFireTime < tick() then
+                                rayCheck.FilterDescendantsInstances = { workspace.Map }
+                                
+                                local projectileMeta = bedwars.ProjectileMeta[projectileData.projectileType]
+                                local projectileSpeed = projectileMeta.launchVelocity
+                                local gravity = projectileMeta.gravitationalAcceleration or 196.2
+                                
+                                local trajectory = calculateTrajectory(
+                                    playerPosition, target, projectileSpeed, gravity
+                                )
+                                
+                                if trajectory then
+                                    targetinfo.Targets[target] = tick() + 1
+                                    
+                                    local fireSuccess = fireProjectileWithLagCompensation(
+                                        projectileData, playerPosition, target, 
+                                        projectileSpeed, gravity
+                                    )
+                                    
+                                    if fireSuccess then
+                                        fireDelays[itemType] = tick() + projectileData.projectileMeta.fireDelaySec
+                                        equipAndFire(projectileData, target)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                task.wait(0.012)
+            until not ProjectileAura.Enabled
+        end
     })
+    
     Targets = ProjectileAura:CreateTargets({
-    	Players = true,
-    	Walls = true,
+        Players = true,
+        Walls = true,
     })
-    local methods = {'Damage', 'Distance'}
-    for i in sortmethods do
-    	if not table.find(methods, i) then
-    		table.insert(methods, i)
-    	end
+    
+    local sortMethods = {'Damage', 'Distance'}
+    for methodName in sortmethods do
+        if not table.find(sortMethods, methodName) then
+            table.insert(sortMethods, methodName)
+        end
     end
+    
     Sort = ProjectileAura:CreateDropdown({
-    	Name = 'Target Mode',
-    	List = methods,
-    	Default = 'Distance'
+        Name = 'Target Mode',
+        List = sortMethods,
+        Default = 'Distance'
     })
-    List = ProjectileAura:CreateTextList({
-    	Name = 'Projectiles',
-    	Default = {'arrow', 'snowball'},
+    
+    ProjectileList = ProjectileAura:CreateTextList({
+        Name = 'Projectiles',
+        Default = {'arrow', 'snowball'},
     })
+    
     FireRate = ProjectileAura:CreateSlider({
-    	Name = 'Fire Rate',
-    	Min = 0,
-    	Max = 2,
-    	Default = 0.02,
-    	Decimal = 100,
-    	Suffix = 'seconds'
+        Name = 'Fire Rate',
+        Min = 0,
+        Max = 2,
+        Default = 0.02,
+        Decimal = 100,
+        Suffix = 'seconds'
     })
+    
     Range = ProjectileAura:CreateSlider({
-    	Name = 'Range',
-    	Min = 1,
-    	Max = 50,
-    	Default = 50,
-    	Suffix = function(val)
-    		return val == 1 and 'stud' or 'studs'
-    	end,
+        Name = 'Range',
+        Min = 1,
+        Max = 50,
+        Default = 50,
+        Suffix = function(val)
+            return val == 1 and 'stud' or 'studs'
+        end,
     })
 end)
 
@@ -8509,7 +8583,7 @@ run(function()
     local AntiSuffocate
     
     AntiSuffocate = vape.Categories.Utility:CreateModule({
-    	Name = 'Anti Suffocate',
+    	Name = 'Anti-Suffocate',
     	Function = function(call)
     		if call then
     			repeat
@@ -8539,7 +8613,7 @@ run(function()
     local AutoBalloon
     
     AutoBalloon = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Balloon',
+        Name = 'Auto-Balloon',
         Function = function(callback)
             if callback then
                 repeat task.wait() until store.matchState ~= 0 or (not AutoBalloon.Enabled)
@@ -8590,7 +8664,7 @@ run(function()
     end
     
     AutoCounter = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Counter TNT',
+        Name = 'Auto-Counter-TNT',
         Function = function(callback)
             if callback then
                 local tnts, placed = {}, {}
@@ -8630,7 +8704,7 @@ run(function()
                 until not AutoCounter.Enabled
             end
         end,
-        Tooltip = 'Automatically places tnt on opponent\'s tnt'
+        Tooltip = 'Automatically places a tnt on opponent\'s tnt'
     })
     
     Mode = AutoCounter:CreateDropdown({
@@ -8675,7 +8749,7 @@ run(function()
     local rayCheck = RaycastParams.new()
     
     AutoLasso = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Lasso',
+        Name = 'Auto-Lasso',
         Function = function(callback)
             if callback then
                 repeat
@@ -8846,7 +8920,7 @@ run(function()
     end
     
     AutoPearl = vape.Categories.Utility:CreateModule({
-    	Name = 'Auto Pearl',
+    	Name = 'Auto-Pearl',
     	Function = function(callback)
     		if callback then
     			local check, lasty
@@ -8947,7 +9021,7 @@ run(function()
     end
     
     AutoPlay = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Play',
+        Name = 'Auto-Play',
         Function = function(callback)
             if callback then
                 AutoPlay:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
@@ -8975,7 +9049,7 @@ run(function()
     local charge = 0
     
     AutoRelease = vape.Categories.Utility:CreateModule({
-    	Name = 'Auto Release',
+    	Name = 'Auto-Release',
     	Function = function(call)
     		if call then
     			launchHook = bedwars.ProjectileLaunchHook:Add('AutoRelease', 20, function(nextLaunch, ...)
@@ -9152,7 +9226,7 @@ run(function()
     end
     
     AutoShoot = vape.Categories.Utility:CreateModule({
-    	Name = 'Auto Shoot',
+    	Name = 'Auto-Shoot',
     	Function = function(call)
     		if call then
     			local start = tick()
@@ -9275,8 +9349,9 @@ run(function()
         end
     end
     
+    
     AutoToxic = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Toxic',
+        Name = 'Auto-Toxic',
         Function = function(callback)
             if callback then
                 AutoToxic:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
