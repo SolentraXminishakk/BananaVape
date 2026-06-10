@@ -321,7 +321,6 @@ local function getShieldAttribute(char)
 	return returned
 end
 
-
 local knockbackSpeed, knockbackBoost = 0, tick()
 local function getSpeed()
 	local multi, increase, modifiers = 0, true, bedwars.SprintController:getMovementStatusModifier():getModifiers()
@@ -3022,6 +3021,144 @@ end)
     Blatant
 ]]
 
+run(function()
+    local AntiFall
+    local Mode
+    local Material
+    local Color
+    local rayCheck = RaycastParams.new()
+    rayCheck.RespectCanCollide = true
+    
+    local function getLowGround()
+        local mag = math.huge
+        for _, pos in bedwars.BlockController:getStore():getAllBlockPositions() do
+            pos = pos * 3
+            if pos.Y < mag and not getPlacedBlock(pos + Vector3.new(0, 3, 0)) then
+                mag = pos.Y
+            end
+        end
+        return mag
+    end
+    
+    AntiFall = vape.Categories.Blatant:CreateModule({
+        Name = 'Anti-Fall',
+        Function = function(callback)
+            if callback then
+                repeat task.wait() until store.matchState ~= 0 or (not AntiFall.Enabled)
+                if not AntiFall.Enabled then return end
+    
+                local pos, debounce = getLowGround(), tick()
+                if pos ~= math.huge then
+                    AntiFallPart = Instance.new('Part')
+                    AntiFallPart.Size = Vector3.new(10000, 1, 10000)
+                    AntiFallPart.Transparency = 1 - Color.Opacity
+                    AntiFallPart.Material = Enum.Material[Material.Value]
+                    AntiFallPart.Color = Color3.fromHSV(Color.Hue, Color.Sat, Color.Value)
+                    AntiFallPart.Position = Vector3.new(0, pos - 2, 0)
+                    AntiFallPart.CanCollide = Mode.Value == 'Collide'
+                    AntiFallPart.Anchored = true
+                    AntiFallPart.CanQuery = false
+                    AntiFallPart.Parent = workspace
+                    AntiFall:Clean(AntiFallPart)
+                    AntiFall:Clean(AntiFallPart.Touched:Connect(function(touched)
+                        if touched.Parent == lplr.Character and entitylib.isAlive and debounce < tick() then
+                            debounce = tick() + 0.1
+                            if Mode.Value == 'Normal' then
+                                local top = getNearGround()
+                                if top then
+                                    local lastTeleport = lplr:GetAttribute('LastTeleported')
+                                    local connection
+                                    connection = runService.PreSimulation:Connect(function()
+                                        if vape.Modules.Fly.Enabled or InfiniteFly.Enabled or vape.Modules['Long Jump'].Enabled then
+                                            connection:Disconnect()
+                                            AntiFallDirection = nil
+                                            return
+                                        end
+    
+                                        if entitylib.isAlive and lplr:GetAttribute('LastTeleported') == lastTeleport then
+                                            local delta = ((top - entitylib.character.RootPart.Position) * Vector3.new(1, 0, 1))
+                                            local root = entitylib.character.RootPart
+                                            AntiFallDirection = delta.Unit == delta.Unit and delta.Unit or Vector3.zero
+                                            root.Velocity *= Vector3.new(1, 0, 1)
+                                            rayCheck.FilterDescendantsInstances = {gameCamera, lplr.Character}
+                                            rayCheck.CollisionGroup = root.CollisionGroup
+    
+                                            local ray = workspace:Raycast(root.Position, AntiFallDirection, rayCheck)
+                                            if ray then
+                                                for _ = 1, 10 do
+                                                    local dpos = roundPos(ray.Position + ray.Normal * 1.5) + Vector3.new(0, 3, 0)
+                                                    if not getPlacedBlock(dpos) then
+                                                        top = Vector3.new(top.X, pos.Y, top.Z)
+                                                        break
+                                                    end
+                                                end
+                                            end
+    
+                                            root.CFrame += Vector3.new(0, top.Y - root.Position.Y, 0)
+                                            if not frictionTable.Speed then
+                                                root.AssemblyLinearVelocity = (AntiFallDirection * getSpeed()) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                                            end
+    
+                                            if delta.Magnitude < 1 then
+                                                connection:Disconnect()
+                                                AntiFallDirection = nil
+                                            end
+                                        else
+                                            connection:Disconnect()
+                                            AntiFallDirection = nil
+                                        end
+                                    end)
+                                    AntiFall:Clean(connection)
+                                end
+                            elseif Mode.Value == 'Velocity' then
+                                entitylib.character.RootPart.Velocity = Vector3.new(entitylib.character.RootPart.Velocity.X, 100, entitylib.character.RootPart.Velocity.Z)
+                            end
+                        end
+                    end))
+                end
+            else
+                AntiFallDirection = nil
+            end
+        end,
+        Tooltip = 'Help\'s you with your Parkinson\'s\nPrevents you from falling into the void.'
+    })
+    Mode = AntiFall:CreateDropdown({
+        Name = 'Move Mode',
+        List = {'Normal', 'Collide', 'Velocity'},
+        Function = function(val)
+            if AntiFallPart then
+                AntiFallPart.CanCollide = val == 'Collide'
+            end
+        end,
+    Tooltip = 'Normal - Smoothly moves you towards the nearest safe point\nVelocity - Launches you upward after touching\nCollide - Allows you to walk on the part'
+    })
+    local materials = {'ForceField'}
+    for _, v in Enum.Material:GetEnumItems() do
+        if v.Name ~= 'ForceField' then
+            table.insert(materials, v.Name)
+        end
+    end
+    Material = AntiFall:CreateDropdown({
+        Name = 'Material',
+        List = materials,
+        Function = function(val)
+            if AntiFallPart then
+                AntiFallPart.Material = Enum.Material[val]
+            end
+        end
+    })
+    Color = AntiFall:CreateColorSlider({
+        Name = 'Color',
+        DefaultOpacity = 0.5,
+        Function = function(h, s, v, o)
+            if AntiFallPart then
+                AntiFallPart.Color = Color3.fromHSV(h, s, v)
+                AntiFallPart.Transparency = 1 - o
+            end
+        end
+    })
+end)
+																					
 run(function()
     local AntiDeath
     local StopThreshold
@@ -10263,13 +10400,180 @@ end)
 run(function()
     local StaffDetector
     local Mode
+    local PresetType
     local Clans
     local Party
     local Profile
     local Users
+    
+    local ROBLOX_STAFF_GROUP = 1200769
+    local EASYGG_GROUP = 4771822
+    
+    local CACHE_FOLDER = 'bananavxpe/cache/'
+    local ROBLOX_STAFF_CACHE = CACHE_FOLDER .. 'roblox_staff.json'
+    local EASYGG_STAFF_CACHE = CACHE_FOLDER .. 'easygg_staff.json'
+    
+    if not isfolder(CACHE_FOLDER) then
+        makefolder(CACHE_FOLDER)
+    end
+    
     local blacklistedclans = {'gg', 'gg2', 'DV', 'DV2'}
-    local blacklisteduserids = {1502104539, 3826146717, 4531785383, 1049767300, 4926350670, 653085195, 184655415, 2752307430, 5087196317, 5744061325, 1536265275}
     local joined = {}
+    
+    local detectedStaffIds = {}
+    
+    local function saveCache(file, data)
+        local success, encoded = pcall(function()
+            return game:GetService('HttpService'):JSONEncode(data)
+        end)
+        if success then
+            writefile(file, encoded)
+        end
+    end
+    
+    local function loadCache(file)
+        if isfile(file) then
+            local success, decoded = pcall(function()
+                return game:GetService('HttpService'):JSONDecode(readfile(file))
+            end)
+            if success then
+                return decoded
+            end
+        end
+        return nil
+    end
+    
+    local function fetchGroupMembersByRank(groupId, minRank, maxRank)
+        local members = {}
+        local cursor = ''
+        local apiUrl = 'https://groups.roblox.com/v1/groups/' .. groupId .. '/roles'
+        
+        local rolesResponse = syn and syn.request or request or function() end
+        local suc, res = pcall(function()
+            return (syn and syn.request or request)({
+                Url = apiUrl,
+                Method = 'GET'
+            })
+        end)
+        
+        if not suc or not res or res.StatusCode ~= 200 then
+            warn("Failed to fetch group roles")
+            return members
+        end
+        
+        local rolesData = game:GetService('HttpService'):JSONDecode(res.Body)
+        local targetRoleIds = {}
+        
+        for _, role in pairs(rolesData.roles or {}) do
+            if role.rank >= minRank and role.rank <= maxRank then
+                table.insert(targetRoleIds, role.id)
+            end
+        end
+        
+        for _, roleId in ipairs(targetRoleIds) do
+            local roleCursor = ''
+            local roleUrl = 'https://groups.roblox.com/v1/groups/' .. groupId .. '/roles/' .. roleId .. '/users?limit=100'
+            
+            repeat
+                local url = roleCursor ~= '' and roleUrl .. '&cursor=' .. roleCursor or roleUrl
+                local suc, res = pcall(function()
+                    return (syn and syn.request or request)({
+                        Url = url,
+                        Method = 'GET'
+                    })
+                end)
+                
+                if suc and res and res.StatusCode == 200 then
+                    local data = game:GetService('HttpService'):JSONDecode(res.Body)
+                    for _, userData in pairs(data.data or {}) do
+                        table.insert(members, {
+                            userId = userData.userId,
+                            username = userData.username,
+                            displayName = userData.displayName
+                        })
+                    end
+                    roleCursor = data.nextPageCursor or ''
+                else
+                    break
+                end
+            until roleCursor == ''
+        end
+        
+        return members
+    end
+
+    local function updateRobloxStaffCache()
+        local cache = loadCache(ROBLOX_STAFF_CACHE) or {lastUpdated = 0, staffIds = {}}
+        
+        if tick() - (cache.lastUpdated or 0) < 86400 then
+            return cache.staffIds
+        end
+        
+        local knownRobloxStaff = {
+            1,
+            2,
+            616,
+            15393,
+            15518,
+            15519,
+            6063, 
+        }
+        
+        cache.staffIds = knownRobloxStaff
+        cache.lastUpdated = tick()
+        saveCache(ROBLOX_STAFF_CACHE, cache)
+        
+        return cache.staffIds
+    end
+    
+    local function updateEasyGGStaffCache()
+        local cache = loadCache(EASYGG_STAFF_CACHE) or {lastUpdated = 0, staffIds = {}, staffByRole = {}}
+        
+        if tick() - (cache.lastUpdated or 0) < 21600 then
+            return cache.staffIds, cache.staffByRole
+        end
+        
+        local staffRanks = {
+            {minRank = 200, maxRank = 255, role = "Owner/Admin"},
+            {minRank = 150, maxRank = 199, role = "Developer"},
+            {minRank = 100, maxRank = 149, role = "Moderator"}
+        }
+        
+        local allStaffIds = {}
+        local staffByRole = {}
+        
+        for _, rankRange in ipairs(staffRanks) do
+            local members = fetchGroupMembersByRank(EASYGG_GROUP, rankRange.minRank, rankRange.maxRank)
+            staffByRole[rankRange.role] = members
+            for _, member in ipairs(members) do
+                table.insert(allStaffIds, member.userId)
+            end
+        end
+        
+        cache.staffIds = allStaffIds
+        cache.staffByRole = staffByRole
+        cache.lastUpdated = tick()
+        saveCache(EASYGG_STAFF_CACHE, cache)
+        
+        print(string.format("[StaffDetector] Cached %d Easy.gg staff members", #allStaffIds))
+        return cache.staffIds, cache.staffByRole
+    end
+    
+    local robloxStaffIds = updateRobloxStaffCache()
+    local easyggStaffIds, easyggStaffByRole = updateEasyGGStaffCache()
+    
+    local allStaffIds = {}
+    for _, id in ipairs(robloxStaffIds) do
+        allStaffIds[id] = "Roblox Staff"
+    end
+    for _, id in ipairs(easyggStaffIds) do
+        allStaffIds[id] = "Easy.gg Staff"
+    end
+    
+    local blacklistedUserIds = {
+        1502104539, 3826146717, 4531785383, 1049767300, 4926350670,
+        653085195, 184655415, 2752307430, 5087196317, 5744061325, 1536265275
+    }
     
     local function getRole(plr, id)
         local suc, res = pcall(function()
@@ -10281,35 +10585,71 @@ run(function()
         return suc and res or 0
     end
     
-    local function staffFunction(plr, checktype)
+    local function isStaffMember(plr)
+        if allStaffIds[plr.UserId] then
+            return true, allStaffIds[plr.UserId]
+        end
+        
+        local suc, isInRobloxGroup = pcall(function()
+            return plr:IsInGroup(ROBLOX_STAFF_GROUP)
+        end)
+        if suc and isInRobloxGroup then
+            robloxStaffIds[#robloxStaffIds + 1] = plr.UserId
+            allStaffIds[plr.UserId] = "Roblox Staff"
+            return true, "Roblox Staff (Group Member)"
+        end
+        
+        local easyRank = getRole(plr, EASYGG_GROUP)
+        if easyRank >= 100 then
+            if not table.find(easyggStaffIds, plr.UserId) then
+                table.insert(easyggStaffIds, plr.UserId)
+                allStaffIds[plr.UserId] = "Easy.gg Staff"
+            end
+            return true, string.format("Easy.gg Staff (Rank %d)", easyRank)
+        end
+        
+        return false, nil
+    end
+    
+    local function staffFunction(plr, checktype, reason)
         if not vape.Loaded then
             repeat task.wait() until vape.Loaded
         end
     
-        notif('StaffDetector', 'Staff Detected ('..checktype..'): '..plr.Name..' ('..plr.UserId..')', 60, 'alert')
-        whitelist.customtags[plr.Name] = {{text = 'GAME STAFF', color = Color3.new(1, 0, 0)}}
+        local staffType = Mode.Value == 'Bedwars' and "Easy.gg Staff" or "Roblox Staff"
+        notif('StaffDetector', string.format('%s Detected: %s (%s) - %s', 
+            staffType, plr.Name, plr.UserId, reason or checktype), 60, 'alert')
+        
+        whitelist.customtags[plr.Name] = {{
+            text = Mode.Value == 'Bedwars' and 'EASY.GG STAFF' or 'ROBLOX STAFF', 
+            color = Mode.Value == 'Bedwars' and Color3.new(1, 0.5, 0) or Color3.new(1, 0, 0)
+        }}
     
         if Party.Enabled and not checktype:find('clan') then
-            bedwars.PartyController:leaveParty()
+            pcall(function()
+                bedwars.PartyController:leaveParty()
+            end)
         end
     
-        if Mode.Value == 'Uninject' then
+        if PresetType.Value == 'Uninject' then
             task.spawn(function()
                 vape:Uninject()
             end)
             game:GetService('StarterGui'):SetCore('SendNotification', {
                 Title = 'StaffDetector',
-                Text = 'Staff Detected ('..checktype..')\n'..plr.Name..' ('..plr.UserId..')',
+                Text = string.format('%s Detected\n%s (%s)\nUninjecting...', staffType, plr.Name, plr.UserId),
                 Duration = 60,
             })
-        elseif Mode.Value == 'Requeue' then
-            bedwars.QueueController:joinQueue(store.queueType)
-        elseif Mode.Value == 'Profile' then
+        elseif PresetType.Value == 'Requeue' then
+            pcall(function()
+                bedwars.QueueController:joinQueue(store.queueType)
+            end)
+        elseif PresetType.Value == 'Profile' then
             vape.Save = function() end
             if vape.Profile ~= Profile.Value then
                 vape:Load(true, Profile.Value)
             end
-        elseif Mode.Value == 'AutoConfig' then
+        elseif PresetType.Value == 'AutoConfig' then
             local safe = {'AutoClicker', 'Reach', 'Sprint', 'HitFix', 'StaffDetector'}
             vape.Save = function() end
             for i, v in vape.Modules do
@@ -10320,6 +10660,7 @@ run(function()
                     v:SetBind('')
                 end
             end
+            notif('StaffDetector', 'AutoConfig: Disabled all unsafe modules', 10, 'warning')
         end
     end
     
@@ -10346,7 +10687,7 @@ run(function()
     
             local friend = checkFriends(tab)
             if not friend then
-                staffFunction(plr, 'impossible_join')
+                staffFunction(plr, 'impossible_join', 'Impossible Join (No mutual friends)')
                 return true
             else
                 notif('StaffDetector', string.format('Spectator %s joined from %s', plr.Name, friend), 20, 'warning')
@@ -10354,77 +10695,158 @@ run(function()
         end
     end
     
+    local function refreshStaffCache()
+        notif('StaffDetector', 'Refreshing staff cache...', 3, 'info')
+        task.spawn(function()
+            local newRobloxIds = updateRobloxStaffCache()
+            local newEasyIds, newEasyRoles = updateEasyGGStaffCache()
+            
+            table.clear(allStaffIds)
+            for _, id in ipairs(newRobloxIds) do
+                allStaffIds[id] = "Roblox Staff"
+            end
+            for _, id in ipairs(newEasyIds) do
+                allStaffIds[id] = "Easy.gg Staff"
+            end
+            
+            notif('StaffDetector', string.format('Cache refreshed! %d Roblox staff, %d Easy.gg staff', 
+                #newRobloxIds, #newEasyIds), 3, 'success')
+        end)
+    end
+    
     local function playerAdded(plr)
         joined[plr.UserId] = plr.Name
         if plr == lplr then return end
-    
-        if table.find(blacklisteduserids, plr.UserId) or table.find(Users.ListEnabled, tostring(plr.UserId)) then
-            staffFunction(plr, 'blacklisted_user')
-        elseif getRole(plr, 5774246) >= 100 then
-            staffFunction(plr, 'staff_role')
-        else
+        
+        if table.find(blacklistedUserIds, plr.UserId) or table.find(Users.ListEnabled, tostring(plr.UserId)) then
+            staffFunction(plr, 'blacklisted_user', 'Custom Blacklist')
+            return
+        end
+        
+        local isStaff = false
+        local staffReason = nil
+        
+        if Mode.Value == 'Bedwars' then
+            local easyRank = getRole(plr, EASYGG_GROUP)
+            if easyRank >= 100 then
+                isStaff = true
+                staffReason = string.format("Easy.gg Staff (Rank %d)", easyRank)
+            end
+		else
+            local suc, isRobloxStaff = pcall(function()
+                return plr:IsInGroup(ROBLOX_STAFF_GROUP)
+            end)
+            if suc and isRobloxStaff then
+                isStaff = true
+                staffReason = "Roblox Staff (Group Member)"
+            end
+        end
+        
+        if isStaff then
+            staffFunction(plr, 'staff_detected', staffReason)
+            return
+        end
+        
+        if Mode.Value == 'Bedwars' and Clans.Enabled then
             local connection
             connection = plr:GetAttributeChangedSignal('Spectator'):Connect(function()
                 checkJoin(plr, connection)
             end)
             StaffDetector:Clean(connection)
+            
             if checkJoin(plr, connection) then
                 return
             end
     
             if not plr:GetAttribute('ClanTag') then
-                plr:GetAttributeChangedSignal('ClanTag'):Wait()
+                local success = pcall(function()
+                    plr:GetAttributeChangedSignal('ClanTag'):Wait()
+                end)
+                if not success then return end
             end
     
-            if table.find(blacklistedclans, plr:GetAttribute('ClanTag')) and vape.Loaded and Clans.Enabled then
+            if table.find(blacklistedclans, plr:GetAttribute('ClanTag')) and vape.Loaded then
                 connection:Disconnect()
-                staffFunction(plr, 'blacklisted_clan_'..plr:GetAttribute('ClanTag'):lower())
+                staffFunction(plr, 'blacklisted_clan_'..plr:GetAttribute('ClanTag'):lower(), 
+                    'Blacklisted Clan: ' .. plr:GetAttribute('ClanTag'))
             end
         end
     end
     
     StaffDetector = vape.Categories.Utility:CreateModule({
-        Name = 'Staff Detector',
+        Name = 'Staff Detector V2',
         Function = function(callback)
             if callback then
+                refreshStaffCache()
+                
                 StaffDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
                 for _, v in playersService:GetPlayers() do
                     task.spawn(playerAdded, v)
                 end
             else
                 table.clear(joined)
+                notif('StaffDetector', 'Staff Detector Disabled', 5, 'info')
             end
         end,
-        Tooltip = 'Detects people with a staff rank ingame'
+        Tooltip = 'Completely Reworked Staff Detection system.\nRewritten By Wintersilence.'
     })
+
     Mode = StaffDetector:CreateDropdown({
-        Name = 'Mode',
-        List = {'Uninject', 'Profile', 'Requeue', 'AutoConfig', 'Notify'},
+        Name = 'Staff Type',
+        List = {'Bedwars Developers', 'Roblox'},
+        Default = 'Bedwars',
+        Tooltip = 'Bedwars: Detects Easy.gg staff members joining your game.\nRoblox: Detects Roblox staff joining your game.'
+    })
+    
+    PresetType = StaffDetector:CreateDropdown({
+        Name = 'Action Mode',
+        List = {'Notify', 'Uninject', 'Requeue', 'Profile', 'AutoConfig'},
+        Default = 'Notify',
         Function = function(val)
             if Profile.Object then
                 Profile.Object.Visible = val == 'Profile'
             end
         end
     })
+    
     Clans = StaffDetector:CreateToggle({
-        Name = 'Blacklist clans',
-        Default = true
+        Name = 'Blacklist Clans',
+        Default = true,
+        Tooltip = 'Detect blacklisted clans (gg, DV, etc.)'
     })
+    
     Party = StaffDetector:CreateToggle({
-        Name = 'Leave party'
+        Name = 'Leave Party',
+        Default = false,
+        Tooltip = 'Automatically leave party when staff detected'
     })
+    
     Profile = StaffDetector:CreateTextBox({
-        Name = 'Profile',
+        Name = 'Profile Name',
         Default = 'default',
         Darker = true,
-        Visible = false
+        Visible = false,
+        Tooltip = 'Profile to switch to when staff detected'
     })
+    
     Users = StaffDetector:CreateTextList({
-        Name = 'Users',
-        Placeholder = 'player (userid)'
+        Name = 'Custom Blacklist',
+        Placeholder = 'User ID',
+        Tooltip = 'Blacklist other extra userids.'
+    })
+    
+    local RefreshButton = StaffDetector:CreateButton({
+        Name = 'Refresh Staff Cache',
+        Function = refreshStaffCache,
+        Tooltip = 'Refresh the Staff Member Cache from api.'
+    })
+    
+    local presetInfo = StaffDetector:CreateLabel({
+        Name = 'Info',
+        Text = 'Bedwars Mode: Detects Easy.gg staff (ranks 100+)\nRoblox Mode: Detects members of locked group 1200769\nCache auto-refreshes every 6 hours',
+        Darker = true
     })
 end)
-
 run(function()
     TrapDisabler = vape.Categories.Utility:CreateModule({
         Name = 'TrapDisabler',
