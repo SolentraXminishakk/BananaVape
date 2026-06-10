@@ -2623,7 +2623,7 @@ run(function()
                 bedwars.SprintController:stopSprinting()
             end
         end,
-        Tooltip = 'Sets your sprinting to true.'
+        Tooltip = 'Locks your sprinting to true.'
     })
 end)
 
@@ -2713,7 +2713,7 @@ run(function()
                 bedwars.KnockbackUtil.applyKnockback = old
             end
         end,
-        Tooltip = 'Reduces knockback taken'
+        Tooltip = 'Reduces knockback taken (100 = Default knockback)'
     })
     Horizontal = Velocity:CreateSlider({
         Name = 'Horizontal',
@@ -2753,7 +2753,7 @@ run(function()
     end
     
     VelocityPlus = vape.Categories.Combat:CreateModule({
-    	Name = 'Velocity Plus',
+    	Name = 'Velocity+',
     	Function = function(callback)
     		if callback then
     			old = bedwars.KnockbackUtil.applyKnockback
