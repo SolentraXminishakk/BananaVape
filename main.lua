@@ -105,11 +105,25 @@ local function loadGameSpecificScript()
 			local success, result = pcall(function()
 				local func = loadstring(scriptContent, tostring(placeId))
 				if func then
-					return func(license)
+					local success1, result1 = pcall(func)
+					if success1 then
+						return true, result1
+					else
+						local success2, result2 = pcall(func, license)
+						if success2 then
+							return true, result2
+						else
+							local success3, result3 = pcall(function() return func(license) end)
+							if success3 then
+								return true, result3
+							end
+						end
+						return nil, result1 or result2 or result3
+					end
 				end
-				return nil
+				return nil, "loadstring returned nil"
 			end)
-			if success then
+			if success and result then
 				print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
 				return true, "Loaded local game script"
 			else
@@ -138,9 +152,26 @@ local function loadGameSpecificScript()
 			local success, result = pcall(function()
 				local func = loadstring(res, tostring(placeId))
 				if func then
-					return func(license)
+					local callSuccess, callResult
+					
+					callSuccess, callResult = pcall(func)
+					if callSuccess then
+						return true, callResult
+					end
+					
+					callSuccess, callResult = pcall(function() return func(license) end)
+					if callSuccess then
+						return true, callResult
+					end
+					
+					callSuccess, callResult = pcall(func, license)
+					if callSuccess then
+						return true, callResult
+					end
+					
+					return nil, "All calling methods failed for downloaded script"
 				end
-				return nil
+				return nil, "loadstring returned nil for downloaded script"
 			end)
 			if success then
 				print("[BananaVape] Successfully loaded downloaded game script for PlaceId: " .. placeId)
@@ -158,80 +189,6 @@ local function loadGameSpecificScript()
 	
 	print("[BananaVape] No game-specific script found for PlaceId: " .. placeId)
 	return false, "No game-specific script found"
-end
-
-local function finishLoading()
-	if not vape then
-		warn("finishLoading called but vape is nil")
-		return
-	end
-	
-	vape.Init = nil
-	vape:Load()
-	
-	task.spawn(function()
-		repeat
-			task.wait(10)
-			if vape and vape.Save then
-				pcall(function() vape:Save() end)
-			end
-		until not vape or not vape.Loaded
-	end)
-
-	local teleportedServers
-	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function(state)
-		if (not teleportedServers) and (not shared.VapeIndependent) then
-			teleportedServers = true
-			local teleportScript = [[
-				if shared.VapeDeveloper then
-					loadstring(readfile('bananavxpe/main.lua'), 'main')(_scriptconfig)
-				else
-					loadstring(game:HttpGet('https://api.catvape.dev/script?key=_key'), 'init')(_scriptconfig)
-				end
-			]]
-			local teleportConfig = httpService:JSONEncode(license)
-			teleportConfig = teleportConfig:gsub('":true', "=true"):gsub('{"', '{')
-			teleportConfig = teleportConfig:gsub(',"', ','):gsub('":', '=')
-			teleportConfig = teleportConfig:gsub('%[', '{'):gsub('%]', '}')
-			teleportScript = teleportScript:gsub('_key', tostring(license.Key or '_key'))
-			teleportScript = teleportScript:gsub('_scriptconfig', teleportConfig)
-			
-			if shared.VapeDeveloper then
-				teleportScript = 'shared.VapeDeveloper = true\n'..teleportScript
-			end
-			if shared.VapeCustomProfile then
-				teleportScript = 'shared.VapeCustomProfile = "'..shared.VapeCustomProfile..'"\n'..teleportScript
-			end
-			queue_on_teleport(teleportScript)
-		end
-	end))
-
-	if not shared.vapereload then
-		if vape and vape.Categories then
-			if vape.Categories.Main and vape.Categories.Main.Options['GUI bind indicator'] and vape.Categories.Main.Options['GUI bind indicator'].Enabled then
-				if getgenv().catrole == 'HWID MISMATCH' then
-					vape:CreateNotification('Cat', 'HWID MISMATCH, Go to the script panel to reset hwid', 25, 'alert')
-					getgenv().catrole = ''
-					task.wait(0.1)
-				end
-				
-				if vape.Place ~= 6872274481 and not license.Closet then
-					task.spawn(redirect)
-				end
-				
-				local authMessage = (getgenv().catname and `Authenticated as {getgenv().catname} with {getgenv().catrole}, ` or '')
-				local guiMessage = (vape.VapeButton and 'Press the button in the top right' or 'Press '..table.concat(vape.Keybind, ' + '):upper())..' to open GUI'
-				
-				vape:CreateNotification('Finished Loading', authMessage..guiMessage, 5)
-				
-				task.delay(1, function()
-					if shared.updated then
-						vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('bananavxpe/profiles/commit.txt')}`, 10, 'info')
-					end
-				end)
-			end
-		end
-	end
 end
 
 local function initialize()
