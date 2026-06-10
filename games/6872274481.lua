@@ -1385,110 +1385,204 @@ sessioninfo:AddItem('Map', 0, function()
 	return mapname
 end, false)
 
+-- FIXED: Time display using tick() instead of os.date
 task.spawn(function()
 	while true do
-		local currentTime = os.date("%H:%M:%S")
+		-- Convert tick() to readable time
+		local seconds = tick() % 86400
+		local hours = math.floor(seconds / 3600) % 24
+		local minutes = math.floor((seconds % 3600) / 60)
+		local secs = math.floor(seconds % 60)
+		
+		-- Format as HH:MM:SS
+		local currentTime = string.format("%02d:%02d:%02d", hours, minutes, secs)
 		global_time.Value = currentTime
 		task.wait(1)
 	end
 end)
 
+-- Alternative using os.time if os.date doesn't work
+task.spawn(function()
+	while true do
+		local success, timeStr = pcall(function()
+			return os.date("%H:%M:%S")
+		end)
+		if success and timeStr ~= "00:00:00" then
+			global_time.Value = timeStr
+		end
+		task.wait(1)
+	end
+end)
+
+-- FIXED: Universal Lagbacks counter
 local universalLagbackCount = 0
 universal_lagbacks.Value = 0
 
 local function setupUniversalLagbackDetection()
 	local lastPosition = {}
 	local lastTimestamp = {}
+	local lastVelocity = {}
 	
-	local originalReject = nil
-	if game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents") then
-		game:GetService("RunService").Heartbeat:Connect(function()
+	-- Track position changes for all players
+	task.spawn(function()
+		while true do
 			for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
 				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 					local rootPart = player.Character.HumanoidRootPart
 					local currentPos = rootPart.Position
+					local currentVel = rootPart.AssemblyLinearVelocity
 					local playerId = player.UserId
 					
+					-- Check for position teleport (lagback)
 					if lastPosition[playerId] then
 						local distance = (currentPos - lastPosition[playerId]).Magnitude
 						local timeDiff = tick() - (lastTimestamp[playerId] or tick())
 						
-						if distance > 50 and timeDiff < 0.5 then
+						-- If moved too far too fast (lagback/teleport)
+						if distance > 30 and timeDiff < 0.3 then
 							universalLagbackCount = universalLagbackCount + 1
 							universal_lagbacks.Value = universalLagbackCount
-							print(`[Universal Lagback] Detected on {player.Name}: {distance} studs in {timeDiff}s`)
+							print(`[Universal Lagback] Position jump on {player.Name}: {math.floor(distance)} studs in {timeDiff*1000}ms`)
+						end
+						
+						-- Check for velocity reset (anticheat flag)
+						if lastVelocity[playerId] and lastVelocity[playerId].Magnitude > 40 and currentVel.Magnitude < 5 then
+							universalLagbackCount = universalLagbackCount + 1
+							universal_lagbacks.Value = universalLagbackCount
+							print(`[Universal Lagback] Velocity reset on {player.Name}: {math.floor(lastVelocity[playerId].Magnitude)} → {math.floor(currentVel.Magnitude)}`)
 						end
 					end
 					
 					lastPosition[playerId] = currentPos
+					lastVelocity[playerId] = currentVel
 					lastTimestamp[playerId] = tick()
 				end
 			end
-		end)
-	end
-end
-
-local function detectUniversalLagbacks()
-	setupUniversalLagbackDetection()
+			task.wait(0.1) -- Check every 100ms
+		end
+	end)
 	
+	-- Detect respawn/void deaths (anticheat flags)
+	local characterAddedCounts = {}
 	game:GetService("Players").LocalPlayer.CharacterAdded:Connect(function(character)
+		local lplr = game:GetService("Players").LocalPlayer
+		characterAddedCounts[lplr.UserId] = (characterAddedCounts[lplr.UserId] or 0) + 1
+		
 		task.wait(0.5)
 		local rootPart = character:FindFirstChild("HumanoidRootPart")
 		if rootPart then
-			task.delay(0.1, function()
+			task.delay(0.2, function()
 				if rootPart.Position.Y < 0 then
 					universalLagbackCount = universalLagbackCount + 1
 					universal_lagbacks.Value = universalLagbackCount
-					print("[Universal Lagback] Detected respawn from void (possible anticheat flag)")
+					print("[Universal Lagback] Void respawn (possible anticheat flag)")
 				end
 			end)
 		end
 	end)
 end
+
+-- FIXED: Bedwars-specific Lagbacks
 local bedwarsLagbackCount = 0
 lagbacks.Value = 0
 
 local function detectBedwarsLagbacks()
 	local lastPosition = nil
-	local lastTick = tick()
+	local lastPositionTime = tick()
+	local rubberbandCount = 0
 	
-	game:GetService("RunService").Stepped:Connect(function()
-		local lplr = game:GetService("Players").LocalPlayer
-		if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
-			local currentPos = lplr.Character.HumanoidRootPart.Position
-			
-			if lastPosition then
-				local distance = (currentPos - lastPosition).Magnitude
-				local timeDiff = tick() - lastTick
+	-- Track position history for rubberbanding
+	local positionHistory = {}
+	local historySize = 5
+	
+	task.spawn(function()
+		while true do
+			local lplr = game:GetService("Players").LocalPlayer
+			if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+				local currentPos = lplr.Character.HumanoidRootPart.Position
+				local currentTime = tick()
 				
-				if distance < -5 and timeDiff < 0.3 then
-					bedwarsLagbackCount = bedwarsLagbackCount + 1
-					lagbacks.Value = bedwarsLagbackCount
-					print(`[Bedwars Lagback] Detected: Position changed by {distance} studs`)
+				-- Add to history
+				table.insert(positionHistory, {pos = currentPos, time = currentTime})
+				while #positionHistory > historySize do
+					table.remove(positionHistory, 1)
 				end
+				
+				-- Detect rubberbanding (going back to previous position)
+				if #positionHistory >= 2 then
+					local prevPos = positionHistory[#positionHistory - 1].pos
+					local prevTime = positionHistory[#positionHistory - 1].time
+					local timeDiff = currentTime - prevTime
+					local distance = (currentPos - prevPos).Magnitude
+					
+					-- Check if we returned to a position from earlier (rubberband)
+					for i = 1, #positionHistory - 1 do
+						local oldPos = positionHistory[i].pos
+						local distToOld = (currentPos - oldPos).Magnitude
+						
+						-- If we returned to a previous position within short time (lagback)
+						if distToOld < 3 and timeDiff < 0.5 and i < #positionHistory - 1 then
+							bedwarsLagbackCount = bedwarsLagbackCount + 1
+							lagbacks.Value = bedwarsLagbackCount
+							print(`[Bedwars Lagback] Rubberband detected: returned to position from {math.floor((currentTime - positionHistory[i].time)*1000)}ms ago`)
+							break
+						end
+					end
+				end
+				
+				lastPosition = currentPos
+				lastPositionTime = currentTime
 			end
-			
-			lastPosition = currentPos
-			lastTick = tick()
+			task.wait(0.05) -- Check every 50ms for better detection
 		end
 	end)
 	
+	-- Detect velocity resets (anticheat correcting speed)
 	local lastVelocity = nil
 	task.spawn(function()
 		while true do
 			local lplr = game:GetService("Players").LocalPlayer
 			if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
 				local currentVelocity = lplr.Character.HumanoidRootPart.AssemblyLinearVelocity
+				local currentVelMag = currentVelocity.Magnitude
 				
-				if lastVelocity and lastVelocity.Magnitude > 30 and currentVelocity.Magnitude < 5 then
-					bedwarsLagbackCount = bedwarsLagbackCount + 1
-					lagbacks.Value = bedwarsLagbackCount
-					print(`[Bedwars Lagback] Velocity reset detected: {lastVelocity.Magnitude} → {currentVelocity.Magnitude}`)
+				if lastVelocity then
+					local lastVelMag = lastVelocity.Magnitude
+					local velDrop = lastVelMag - currentVelMag
+					
+					-- Detect sudden velocity drop (anticheat correction)
+					if velDrop > 40 and currentVelMag < 10 then
+						bedwarsLagbackCount = bedwarsLagbackCount + 1
+						lagbacks.Value = bedwarsLagbackCount
+						print(`[Bedwars Lagback] Velocity correction: {math.floor(lastVelMag)} → {math.floor(currentVelMag)} (drop of {math.floor(velDrop)})`)
+					end
 				end
 				
 				lastVelocity = currentVelocity
 			end
-			task.wait(0.2)
+			task.wait(0.15)
+		end
+	end)
+	
+	-- Detect position being forced back (network rejection)
+	local lastNetworkPos = nil
+	game:GetService("RunService").Heartbeat:Connect(function()
+		local lplr = game:GetService("Players").LocalPlayer
+		if lplr.Character and lplr.Character:FindFirstChild("HumanoidRootPart") then
+			local currentPos = lplr.Character.HumanoidRootPart.Position
+			
+			if lastNetworkPos then
+				local distance = (currentPos - lastNetworkPos).Magnitude
+				-- If position was significantly corrected backward
+				if distance > 10 and distance < 50 then
+					-- This might be a lagback
+					bedwarsLagbackCount = bedwarsLagbackCount + 1
+					lagbacks.Value = bedwarsLagbackCount
+					print(`[Bedwars Lagback] Position correction: {math.floor(distance)} studs`)
+				end
+			end
+			
+			lastNetworkPos = currentPos
 		end
 	end)
 end
@@ -1498,7 +1592,7 @@ task.delay(1, function()
 end)
 
 -- Start detection functions
-detectUniversalLagbacks()
+setupUniversalLagbackDetection()
 detectBedwarsLagbacks()
 
 task.spawn(function()
@@ -1509,7 +1603,7 @@ task.spawn(function()
 		mapname = store.map.Name
 		mapname = string.gsub(string.split(mapname, '_')[2] or mapname, '-', '') or 'Blank'
 		if store.map then
-			vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v) -- bedwars game is so bad bro 😭 how did you even break this event
+			vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v)
 				task.delay(0, function()
 					if v:GetAttribute('Block') and (v:GetAttribute('PlacedByUserId') or 0) ~= 0 then
 						local data = {
@@ -1518,10 +1612,10 @@ task.spawn(function()
 							},
 							player = playersService:GetPlayerByUserId(v:GetAttribute('PlacedByUserId')),
 						}
-						for i, v in cache do
-							if ((data.blockRef.blockPosition * 3) - v[1]).Magnitude <= 30 then
-								table.clear(v[3])
-								table.clear(v)
+						for i, cached in cache do
+							if ((data.blockRef.blockPosition * 3) - cached[1]).Magnitude <= 30 then
+								table.clear(cached[3])
+								table.clear(cached)
 								cache[i] = nil
 							end
 						end
@@ -1554,7 +1648,7 @@ vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
 		kills:Increment()
 	end
 end))
-
+		
 	task.spawn(function()
 		local rayParams = RaycastParams.new()
 		rayParams.FilterType = Enum.RaycastFilterType.Include
