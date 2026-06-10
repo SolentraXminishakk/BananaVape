@@ -91,7 +91,7 @@ end)
 run(function()
     local AutoGamble
     
-    AutoGamble = vape.Categories.Minigames:CreateModule({
+    AutoGamble = vape.Categories.Inventory:CreateModule({
         Name = 'AutoGamble',
         Function = function(callback)
             if callback then
@@ -121,6 +121,6 @@ run(function()
                 until not AutoGamble.Enabled
             end
         end,
-        Tooltip = 'Automatically opens lucky crates'
+        Tooltip = 'Automatically opens up lucky crates'
     })
 end)
