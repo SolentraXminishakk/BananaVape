@@ -10073,6 +10073,123 @@ run(function()
 end)
 
 run(function()
+    local AutoSuffocate
+    local Range
+    local LimitItem
+    
+    local function fixPosition(pos)
+        return bedwars.BlockController:getBlockPosition(pos) * 3
+    end
+    
+    AutoSuffocate = vape.Categories.World:CreateModule({
+        Name = 'Auto Suffocate',
+        Function = function(callback)
+            if callback then
+                repeat
+                    local item = store.hand.toolType == 'block' and store.hand.tool.Name or not LimitItem.Enabled and getWool()
+    
+                    if item then
+                        local plrs = entitylib.AllPosition({
+                            Part = 'RootPart',
+                            Range = Range.Value,
+                            Players = true
+                        })
+    
+                        for _, ent in plrs do
+                            local needPlaced = {}
+    
+                            for _, side in Enum.NormalId:GetEnumItems() do
+                                side = Vector3.fromNormalId(side)
+                                if side.Y ~= 0 then continue end
+    
+                                side = fixPosition(ent.RootPart.Position + side * 2)
+                                if not getPlacedBlock(side) then
+                                    table.insert(needPlaced, side)
+                                end
+                            end
+    
+                            if #needPlaced < 3 then
+                                table.insert(needPlaced, fixPosition(ent.Head.Position))
+                                table.insert(needPlaced, fixPosition(ent.RootPart.Position - Vector3.new(0, 1, 0)))
+    
+                                for _, pos in needPlaced do
+                                    if not getPlacedBlock(pos) then
+                                        task.spawn(bedwars.placeBlock, pos, item)
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+    
+                    task.wait(0.09)
+                until not AutoSuffocate.Enabled
+            end
+        end,
+        Tooltip = 'Places blocks on nearby confined entities'
+    })
+    Range = AutoSuffocate:CreateSlider({
+        Name = 'Range',
+        Min = 1,
+        Max = 20,
+        Default = 20,
+        Suffix = function(val)
+            return val == 1 and 'stud' or 'studs'
+        end
+    })
+    LimitItem = AutoSuffocate:CreateToggle({
+        Name = 'Limit to Items',
+        Default = true
+    })
+end)
+
+run(function()
+    local AutoTool
+    local old, event
+    
+    local function switchHotbarItem(block)
+        if block and not block:GetAttribute('NoBreak') and not block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
+            local tool, slot = store.tools[bedwars.ItemMeta[block.Name].block.breakType], nil
+            if tool then
+                for i, v in store.inventory.hotbar do
+                    if v.item and v.item.itemType == tool.itemType then slot = i - 1 break end
+                end
+    
+                if hotbarSwitch(slot) then
+                    if inputService:IsMouseButtonPressed(0) then 
+                        event:Fire() 
+                    end
+                    return true
+                end
+            end
+        end
+    end
+    
+    AutoTool = vape.Categories.World:CreateModule({
+        Name = 'Auto Tool',
+        Function = function(callback)
+            if callback then
+                event = Instance.new('BindableEvent')
+                AutoTool:Clean(event)
+                AutoTool:Clean(event.Event:Connect(function()
+                    contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
+                end))
+                old = bedwars.BlockBreaker.hitBlock
+                bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
+                    local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
+                    if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
+                    return old(self, maid, raycastparams, ...)
+                end
+            else
+                bedwars.BlockBreaker.hitBlock = old
+                old = nil
+            end
+        end,
+        Tooltip = 'Automatically selects the correct tool'
+    })
+end)
+																																		
+run(function()
     local StaffDetector
     local Mode
     local Clans
@@ -10269,123 +10386,6 @@ run(function()
             end
         end,
         Tooltip = 'Lets you stay ingame without getting kicked'
-    })
-end)
-
-run(function()
-    local AutoSuffocate
-    local Range
-    local LimitItem
-    
-    local function fixPosition(pos)
-        return bedwars.BlockController:getBlockPosition(pos) * 3
-    end
-    
-    AutoSuffocate = vape.Categories.World:CreateModule({
-        Name = 'Auto Suffocate',
-        Function = function(callback)
-            if callback then
-                repeat
-                    local item = store.hand.toolType == 'block' and store.hand.tool.Name or not LimitItem.Enabled and getWool()
-    
-                    if item then
-                        local plrs = entitylib.AllPosition({
-                            Part = 'RootPart',
-                            Range = Range.Value,
-                            Players = true
-                        })
-    
-                        for _, ent in plrs do
-                            local needPlaced = {}
-    
-                            for _, side in Enum.NormalId:GetEnumItems() do
-                                side = Vector3.fromNormalId(side)
-                                if side.Y ~= 0 then continue end
-    
-                                side = fixPosition(ent.RootPart.Position + side * 2)
-                                if not getPlacedBlock(side) then
-                                    table.insert(needPlaced, side)
-                                end
-                            end
-    
-                            if #needPlaced < 3 then
-                                table.insert(needPlaced, fixPosition(ent.Head.Position))
-                                table.insert(needPlaced, fixPosition(ent.RootPart.Position - Vector3.new(0, 1, 0)))
-    
-                                for _, pos in needPlaced do
-                                    if not getPlacedBlock(pos) then
-                                        task.spawn(bedwars.placeBlock, pos, item)
-                                        break
-                                    end
-                                end
-                            end
-                        end
-                    end
-    
-                    task.wait(0.09)
-                until not AutoSuffocate.Enabled
-            end
-        end,
-        Tooltip = 'Places blocks on nearby confined entities'
-    })
-    Range = AutoSuffocate:CreateSlider({
-        Name = 'Range',
-        Min = 1,
-        Max = 20,
-        Default = 20,
-        Suffix = function(val)
-            return val == 1 and 'stud' or 'studs'
-        end
-    })
-    LimitItem = AutoSuffocate:CreateToggle({
-        Name = 'Limit to Items',
-        Default = true
-    })
-end)
-
-run(function()
-    local AutoTool
-    local old, event
-    
-    local function switchHotbarItem(block)
-        if block and not block:GetAttribute('NoBreak') and not block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
-            local tool, slot = store.tools[bedwars.ItemMeta[block.Name].block.breakType], nil
-            if tool then
-                for i, v in store.inventory.hotbar do
-                    if v.item and v.item.itemType == tool.itemType then slot = i - 1 break end
-                end
-    
-                if hotbarSwitch(slot) then
-                    if inputService:IsMouseButtonPressed(0) then 
-                        event:Fire() 
-                    end
-                    return true
-                end
-            end
-        end
-    end
-    
-    AutoTool = vape.Categories.World:CreateModule({
-        Name = 'Auto Tool',
-        Function = function(callback)
-            if callback then
-                event = Instance.new('BindableEvent')
-                AutoTool:Clean(event)
-                AutoTool:Clean(event.Event:Connect(function()
-                    contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
-                end))
-                old = bedwars.BlockBreaker.hitBlock
-                bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
-                    local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
-                    if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
-                    return old(self, maid, raycastparams, ...)
-                end
-            else
-                bedwars.BlockBreaker.hitBlock = old
-                old = nil
-            end
-        end,
-        Tooltip = 'Automatically selects the correct tool'
     })
 end)
 
@@ -10707,6 +10707,163 @@ run(function()
     })
     Switch = BedProtector:CreateToggle({Name = 'Auto Switch'})
     Smart = BedProtector:CreateToggle({Name = 'Smart', Default = true})
+end)
+
+run(function()
+    vape.Categories.World:CreateModule({
+        Name = 'OldTheme',
+        Function = function(callback)
+            if callback then
+                local originalMaterials = {}
+                
+                local function applySmoothPlastic()
+                    for _, descendant in ipairs(workspace:GetDescendants()) do
+                        if descendant:IsA("BasePart") and descendant.Material ~= Enum.Material.SmoothPlastic then
+                            if not originalMaterials[descendant] then
+                                originalMaterials[descendant] = descendant.Material
+                            end
+                            descendant.Material = Enum.Material.SmoothPlastic
+                        end
+                    end
+                end
+                
+                local function applyVibrantLighting()
+                    local lighting = game:GetService("Lighting")
+                    
+                    originalMaterials.Lighting = {
+                        Brightness = lighting.Brightness,
+                        ClockTime = lighting.ClockTime,
+                        ExposureCompensation = lighting.ExposureCompensation,
+                        GlobalShadows = lighting.GlobalShadows,
+                        Ambient = lighting.Ambient,
+                        ColorShift_Top = lighting.ColorShift_Top,
+                        ColorShift_Bottom = lighting.ColorShift_Bottom,
+                        EnvironmentDiffuseScale = lighting.EnvironmentDiffuseScale,
+                        EnvironmentSpecularScale = lighting.EnvironmentSpecularScale,
+                        OutdoorAmbient = lighting.OutdoorAmbient,
+                        ShadowSoftness = lighting.ShadowSoftness,
+                        Technology = lighting.Technology
+                    }
+                    
+                    lighting.Brightness = 2.5
+                    lighting.ClockTime = 14
+                    lighting.ExposureCompensation = 1
+                    lighting.GlobalShadows = true
+                    lighting.Ambient = Color3.fromRGB(180, 180, 180)
+                    lighting.ColorShift_Top = Color3.fromRGB(255, 200, 150)
+                    lighting.ColorShift_Bottom = Color3.fromRGB(100, 100, 150)
+                    lighting.EnvironmentDiffuseScale = 1.2
+                    lighting.EnvironmentSpecularScale = 1
+                    lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+                    lighting.ShadowSoftness = 0.3
+                    lighting.Technology = Enum.Technology.ShadowMap
+                    
+                    lighting.FogEnd = 1000
+                    lighting.FogStart = 500
+                end
+                
+                local function applyMinimalisticSky()
+                    local lighting = game:GetService("Lighting")
+                    
+                    local sky = lighting:FindFirstChild("Sky")
+                    if sky then
+                        originalMaterials.Sky = {
+                            SkyboxBk = sky.SkyboxBk,
+                            SkyboxDn = sky.SkyboxDn,
+                            SkyboxFt = sky.SkyboxFt,
+                            SkyboxLf = sky.SkyboxLf,
+                            SkyboxRt = sky.SkyboxRt,
+                            SkyboxUp = sky.SkyboxUp
+                        }
+                        
+                        local blankTexture = "rbxasset://textures/Part/EmptyTexture.png"
+                        sky.SkyboxBk = blankTexture
+                        sky.SkyboxDn = blankTexture
+                        sky.SkyboxFt = blankTexture
+                        sky.SkyboxLf = blankTexture
+                        sky.SkyboxRt = blankTexture
+                        sky.SkyboxUp = blankTexture
+                    end
+                end
+                
+                local function applyVibrantTerrain()
+                    local terrain = workspace.Terrain
+                    
+                    if not originalMaterials.TerrainColors then
+                        originalMaterials.TerrainColors = {
+                            WaterColor = terrain.WaterColor,
+                            WaterReflectance = terrain.WaterReflectance,
+                            WaterWaveSize = terrain.WaterWaveSize,
+                            WaterTransparency = terrain.WaterTransparency
+                        }
+                    end
+                    
+                    terrain.WaterColor = Color3.fromRGB(0, 150, 255)
+                    terrain.WaterReflectance = 0.3
+                    terrain.WaterWaveSize = 0.3
+                    terrain.WaterTransparency = 0.85
+                end
+                
+                local function onDescendantAdded(descendant)
+                    task.wait(0.1)
+                    if descendant:IsA("BasePart") then
+                        if not originalMaterials[descendant] then
+                            originalMaterials[descendant] = descendant.Material
+                        end
+                        descendant.Material = Enum.Material.SmoothPlastic
+                    end
+                end
+                
+                applySmoothPlastic()
+                applyVibrantLighting()
+                applyMinimalisticSky()
+                applyVibrantTerrain()
+                
+                local connection = workspace.DescendantAdded:Connect(onDescendantAdded)
+                vape:Clean(connection)
+                
+                for _, decal in ipairs(workspace:GetDescendants()) do
+                    if decal:IsA("Decal") then
+                        decal.Transparency = 1
+                    end
+                end
+                
+                vape:CreateNotification("OldTheme", "Applied SmoothPlastic textures with vibrant minimalistic lighting!", 3)
+                
+            else
+                for part, originalMaterial in pairs(originalMaterials) do
+                    if part and part:IsA("BasePart") and originalMaterial then
+                        pcall(function()
+                            part.Material = originalMaterial
+                        end)
+                    end
+                end
+                
+                local lighting = game:GetService("Lighting")
+                if originalMaterials.Lighting then
+                    for setting, value in pairs(originalMaterials.Lighting) do
+                        pcall(function()
+                            lighting[setting] = value
+                        end)
+                    end
+                end
+                
+                if originalMaterials.Sky then
+                    local sky = lighting:FindFirstChild("Sky")
+                    if sky then
+                        for setting, value in pairs(originalMaterials.Sky) do
+                            pcall(function()
+                                sky[setting] = value
+                            end)
+                        end
+                    end
+                end
+                
+                vape:CreateNotification("OldTheme", "Reverted to original textures and lighting!", 3)
+            end
+        end,
+        Tooltip = 'Brings back the Old S1 Lighting and Textures!'
+    })
 end)
 
 run(function()
