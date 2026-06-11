@@ -34,22 +34,11 @@ local function downloadFile(path, func)
         local relativePath = path:gsub('bananavxpe/', '')
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
         
-        task.wait(0.1)
+        -- NO pcall, NO task.wait - just raw
+        local res = game:HttpGet(url)
         
-        local suc, res = pcall(function()
-            return game:HttpGet(url, true)
-        end)
-        
-        if not suc then
-            warn("[BananaVape] HttpGet failed, retrying... " .. tostring(res))
-            task.wait(0.5)
-            suc, res = pcall(function()
-                return game:HttpGet(url, true)
-            end)
-        end
-        
-        if not suc or res == '404: Not Found' then
-            error(res or "Failed to download")
+        if res == '404: Not Found' then
+            error("Failed to download: " .. path)
         end
         
         if path:find('.lua') then
