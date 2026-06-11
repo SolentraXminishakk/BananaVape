@@ -11836,6 +11836,8 @@ end)
     Inventory
 ]]
 
+print("[DEBUG] Inventory category exists?", vape.Categories.Inventory ~= nil)
+
 run(function()
     local ArmorSwitch
     local Mode
