@@ -1,23 +1,4 @@
 --!nocheck
-local guiContent = downloadFile('bananavxpe/guis/new.lua')
-if not guiContent then
-    error("Failed to load GUI file")
-end
-
-local loadFunc = loadstring(guiContent, 'gui')
-if not loadFunc then
-    error("Failed to compile GUI file")
-end
-
-vape = loadFunc(license)
-if not vape then
-    error("Failed to initialize vape")
-end
-
-if not finishLoading then
-    error("GUI did not define finishLoading() function")
-end
-
 local license = ... or {}
 license.Key = script_key or license.Key or nil
 
@@ -53,7 +34,6 @@ local function downloadFile(path, func)
         local relativePath = path:gsub('bananavxpe/', '')
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
         
-        -- NO pcall, NO task.wait - just raw
         local res = game:HttpGet(url)
         
         if res == '404: Not Found' then
