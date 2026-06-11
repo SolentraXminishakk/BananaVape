@@ -1,3 +1,5 @@
+--!nocheck
+-- CRITICAL FIX: Override readfile to NEVER return boolean
 local oldReadfile = readfile
 readfile = function(file)
     local result = oldReadfile(file)
@@ -33,12 +35,6 @@ local loadstring = function(...)
 end
 
 local queue_on_teleport = queue_on_teleport or function() end
-local isfile = isfile or function(file)
-	local suc, res = pcall(function()
-		return readfile(file)
-	end)
-	return suc and res ~= nil and res ~= ''
-end
 
 local cloneref = cloneref or function(obj)
 	return obj
