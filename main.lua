@@ -53,42 +53,58 @@ local redirect = function()
 	end
 end
 
+-- Replace the entire downloadFile function in init.lua with this:
 local function downloadFile(path, func)
-	if isfile(path) then
-		return (func or readfile)(path)
-	end
-	
-	warn("Downloading: " .. path)
-	local commitFile = 'bananavxpe/profiles/commit.txt'
-	
-	if not isfile(commitFile) then
-		warn("commit.txt not found, creating default")
-		writefile(commitFile, 'main')
-	end
-	
-	local commit = readfile(commitFile)
-	local relativePath = select(1, path:gsub('bananavxpe/', ''))
-	local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/'..relativePath
-	
-	local suc, res = pcall(function()
-		return game:HttpGet(url, true)
-	end)
-	
-	if not suc or res == '404: Not Found' then
-		warn("Failed to download: " .. path .. " - " .. tostring(res))
-		return nil
-	end
-	
-	if suc and res then
+	if not isfile(path) then
+		if not license.Closet then
+			print("[BananaVape] Downloading: " .. path)
+		end
+		
+		-- FIX: Ensure commit.txt exists and contains a valid string
+		local commitPath = 'bananavxpe/profiles/commit.txt'
+		if not isfile(commitPath) then
+			writefile(commitPath, 'main')
+		end
+		
+		local commit = readfile(commitPath)
+		if type(commit) ~= "string" then
+			warn("Commit was " .. type(commit) .. ", resetting to 'main'")
+			commit = 'main'
+			writefile(commitPath, 'main')
+		end
+		
+		commit = commit:gsub("%s+", "")
+		
+		if commit == "" or commit == nil then
+			commit = "main"
+		end
+		
+		local relativePath = select(1, path:gsub('bananavxpe/', ''))
+		if type(relativePath) ~= "string" then
+			relativePath = tostring(relativePath) or ""
+		end
+		
+		local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
+		
+		-- Validate URL before making request
+		if type(url) ~= "string" or url == "" then
+			error("Invalid URL generated: " .. tostring(url))
+		end
+		
+		local suc, res = pcall(function()
+			return game:HttpGet(url, true)
+		end)
+		
+		if not suc or res == '404: Not Found' then
+			error(res or "Failed to download")
+		end
+		
 		if path:find('.lua') then
 			res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
 		end
 		writefile(path, res)
-		print("Downloaded: " .. path)
-		return (func or readfile)(path)
 	end
-	
-	return nil
+	return (func or readfile)(path)
 end
 
 local function loadGameSpecificScript()
