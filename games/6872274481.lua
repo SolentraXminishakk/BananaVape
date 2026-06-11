@@ -1,5 +1,4 @@
-local oldReadfile = readfile; readfile = function(f) local r = oldReadfile(f); return type(r) == "string" and r or "" end
-
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 local canDebug = true
 local run = function(func)
 	func()
@@ -654,26 +653,13 @@ run(function()
 						end))
 					end
 					
-local updateConnections = entitylib.getUpdateConnections(entity)
-
-if type(updateConnections) == "table" then
-    for _, v in ipairs(updateConnections) do
-        if v and type(v.Connect) == "function" then
-            local connection = v:Connect(function()
-                entity.Health = (char:GetAttribute('Health') or 100) + getShieldAttribute(char)
-                entity.MaxHealth = char:GetAttribute('MaxHealth') or 100
-                entitylib.Events.EntityUpdated:Fire(entity)
-            end)
-            table.insert(entity.Connections, connection)
-        elseif type(v) == "boolean" then
-            warn("Skipping boolean value in updateConnections")
-        else
-            warn("Invalid connection object:", type(v))
-        end
-    end
-else
-    warn("getUpdateConnections did not return a table, got:", type(updateConnections))
-end
+					for _, v in entitylib.getUpdateConnections(entity) do
+						table.insert(entity.Connections, v:Connect(function()
+							entity.Health = (char:GetAttribute('Health') or 100) + getShieldAttribute(char)
+							entity.MaxHealth = char:GetAttribute('MaxHealth') or 100
+							entitylib.Events.EntityUpdated:Fire(entity)
+						end))
+					end
 
 					for _, v in updateobjects do
 						table.insert(entity.Connections, v:GetPropertyChangedSignal('Value'):Connect(function()
@@ -10134,53 +10120,6 @@ run(function()
 end)
 
 run(function()
-    local ShopTierBypass
-    local tiered, nexttier = {}, {}
-    local old
-    
-    ShopTierBypass = vape.Categories.Utility:CreateModule({
-        Name = 'Shop Tier Bypass',
-        Function = function(callback)
-            if callback then
-                repeat task.wait() until store.shopLoaded or not ShopTierBypass.Enabled
-                if ShopTierBypass.Enabled then
-                    for _, v in bedwars.Shop.ShopItems do
-                        tiered[v] = v.tiered
-                        nexttier[v] = v.nextTier
-                        v.nextTier = nil
-                        v.tiered = nil
-                    end
-    
-                    old = bedwars.Shop.getShop
-    				bedwars.Shop.getShop = function(...)
-    					local res = {old(...)}
-    					for i, v in res[1] do
-    						v.nextTier = nil
-    						v.tiered = nil
-    					end
-    					return unpack(res)
-    				end
-                end
-            else
-                if old then
-                    bedwars.Shop.getShop = old
-                    old = nil
-                end
-                for i, v in tiered do
-                    i.tiered = v
-                end
-                for i, v in nexttier do
-                    i.nextTier = v
-                end
-                table.clear(nexttier)
-                table.clear(tiered)
-            end
-        end,
-        Tooltip = 'Lets you buy things like armor early.'
-    })
-end)
-
-run(function()
     local AutoSuffocate
     local Range
     local LimitItem
@@ -11849,6 +11788,53 @@ end)
 --[[
     Inventory
 ]]
+
+run(function()
+    local ShopTierBypass
+    local tiered, nexttier = {}, {}
+    local old
+    
+    ShopTierBypass = vape.Categories.Utility:CreateModule({
+        Name = 'Shop Tier Bypass',
+        Function = function(callback)
+            if callback then
+                repeat task.wait() until store.shopLoaded or not ShopTierBypass.Enabled
+                if ShopTierBypass.Enabled then
+                    for _, v in bedwars.Shop.ShopItems do
+                        tiered[v] = v.tiered
+                        nexttier[v] = v.nextTier
+                        v.nextTier = nil
+                        v.tiered = nil
+                    end
+    
+                    old = bedwars.Shop.getShop
+    				bedwars.Shop.getShop = function(...)
+    					local res = {old(...)}
+    					for i, v in res[1] do
+    						v.nextTier = nil
+    						v.tiered = nil
+    					end
+    					return unpack(res)
+    				end
+                end
+            else
+                if old then
+                    bedwars.Shop.getShop = old
+                    old = nil
+                end
+                for i, v in tiered do
+                    i.tiered = v
+                end
+                for i, v in nexttier do
+                    i.nextTier = v
+                end
+                table.clear(nexttier)
+                table.clear(tiered)
+            end
+        end,
+        Tooltip = 'Lets you buy things like armor early.'
+    })
+end)
 
 run(function()
     local ArmorSwitch
