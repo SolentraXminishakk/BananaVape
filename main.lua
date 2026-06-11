@@ -153,7 +153,16 @@ local function loadGameSpecificScript()
 	end
 	
 	local function executeScript(scriptContent, scriptName)
-		if not scriptContent or scriptContent == "" then
+		if type(scriptContent) == "boolean" then
+			print("[BananaVape] Script content is boolean (false), treating as empty")
+			return false, "Script content is boolean (file read failed)"
+		end
+		
+		if type(scriptContent) ~= "string" then
+			return false, "Script content is not a string (type: " .. type(scriptContent) .. ")"
+		end
+		
+		if scriptContent == "" then
 			return false, "Script content is empty"
 		end
 		
@@ -162,30 +171,16 @@ local function loadGameSpecificScript()
 			return false, "Compile error: " .. tostring(compileError)
 		end
 		
-		local methods = {
-			{name = "No arguments", fn = function() return pcall(func) end},
-			{name = "With license", fn = function() return pcall(function() return func(license) end) end},
-			{name = "License as arg", fn = function() return pcall(func, license) end},
-			{name = "With environment", fn = function() 
-				local env = { license = license, shared = shared, vape = vape, _G = _G }
-				setfenv(func, env)
-				return pcall(func)
-			end},
-			{name = "Auto-execute", fn = function()
-				return pcall(function()
-					local chunk = loadstring(scriptContent, scriptName)
-					if chunk then chunk() end
-					return true
-				end)
-			end}
-		}
-		
-		for _, method in ipairs(methods) do
-			local success, result = method.fn()
-			if success then
-				print("[BananaVape] Script executed successfully")
-				return true, result
-			end
+		local success, result = pcall(func, license)
+		if success then
+			print("[BananaVape] Script executed successfully")
+			return true, result
+		end
+	
+		success, result = pcall(func)
+		if success then
+			print("[BananaVape] Script executed successfully (no args)")
+			return true, result
 		end
 		
 		return false, "All execution methods failed"
@@ -194,18 +189,38 @@ local function loadGameSpecificScript()
 	if isfile(gameScriptPath) then
 		print("[BananaVape] Found local game script, loading...")
 		local scriptContent = readfile(gameScriptPath)
-		local success, result = executeScript(scriptContent, tostring(placeId))
-		if success then
-			print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
-			return true, "Loaded local game script"
+		
+		print("[BananaVape] readfile returned type: " .. type(scriptContent))
+		
+		if type(scriptContent) == "boolean" then
+			warn("[BananaVape] readfile returned boolean, attempting to re-read or redownload")
+			pcall(function() writefile(gameScriptPath, '') end)
+			scriptContent = nil
+		end
+		
+		if scriptContent and type(scriptContent) == "string" then
+			local success, result = executeScript(scriptContent, tostring(placeId))
+			if success then
+				print("[BananaVape] Successfully loaded local game script for PlaceId: " .. placeId)
+				return true, "Loaded local game script"
+			else
+				warn("Failed to load local game script: " .. tostring(result))
+			end
 		else
-			warn("Failed to load local game script: " .. tostring(result))
+			warn("[BananaVape] Local game script file exists but readfile returned invalid data")
 		end
 	end
 	
 	if not shared.VapeDeveloper then
 		print("[BananaVape] Attempting to download game script from GitHub...")
-		local commit = isfile('bananavxpe/profiles/commit.txt') and readfile('bananavxpe/profiles/commit.txt') or 'main'
+		local commit = 'main'
+		if isfile('bananavxpe/profiles/commit.txt') then
+			local commitContent = readfile('bananavxpe/profiles/commit.txt')
+			if type(commitContent) == "string" and commitContent ~= "" then
+				commit = commitContent
+			end
+		end
+		
 		local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
 		print("[BananaVape] Download URL: " .. url)
 		
@@ -213,7 +228,7 @@ local function loadGameSpecificScript()
 			return game:HttpGet(url, true)
 		end)
 		
-		if suc and res and res ~= '404: Not Found' and res ~= '' then
+		if suc and res and type(res) == "string" and res ~= '404: Not Found' and res ~= '' then
 			print("[BananaVape] Downloaded game script, saving and loading...")
 			
 			if not res:find('This watermark is used to delete the file') then
@@ -230,7 +245,7 @@ local function loadGameSpecificScript()
 			end
 		else
 			print("[BananaVape] Game script not found on GitHub for PlaceId: " .. placeId)
-			if res == '404: Not Found' then
+			if type(res) == "string" and res == '404: Not Found' then
 				print("[BananaVape] No custom module exists for this game yet")
 			end
 		end
