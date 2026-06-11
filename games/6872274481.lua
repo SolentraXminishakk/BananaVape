@@ -11794,7 +11794,7 @@ run(function()
     local tiered, nexttier = {}, {}
     local old
     
-    ShopTierBypass = vape.Categories.Utility:CreateModule({
+    ShopTierBypass = vape.Categories.Inventory:CreateModule({
         Name = 'Shop Tier Bypass',
         Function = function(callback)
             if callback then
