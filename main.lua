@@ -1,3 +1,22 @@
+local oldReadfile = readfile
+readfile = function(file)
+    local result = oldReadfile(file)
+    if type(result) == "boolean" then
+        return ""
+    end
+    return result or ""
+end
+
+local oldIsfile = isfile
+isfile = function(file)
+    local result = oldIsfile(file)
+    if type(result) == "boolean" then
+        return result
+    end
+    local content = readfile(file)
+    return content ~= nil and content ~= "" and type(content) == "string"
+end
+
 local license = ... or {}
 license.Key = script_key or license.Key or nil
 
