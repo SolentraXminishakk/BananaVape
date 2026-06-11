@@ -1,3 +1,5 @@
+local oldReadfile = readfile; readfile = function(f) local r = oldReadfile(f); return type(r) == "string" and r or "" end
+
 local canDebug = true
 local run = function(func)
 	func()
