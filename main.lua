@@ -1,4 +1,23 @@
 --!nocheck
+local guiContent = downloadFile('bananavxpe/guis/new.lua')
+if not guiContent then
+    error("Failed to load GUI file")
+end
+
+local loadFunc = loadstring(guiContent, 'gui')
+if not loadFunc then
+    error("Failed to compile GUI file")
+end
+
+vape = loadFunc(license)
+if not vape then
+    error("Failed to initialize vape")
+end
+
+if not finishLoading then
+    error("GUI did not define finishLoading() function")
+end
+
 local license = ... or {}
 license.Key = script_key or license.Key or nil
 
