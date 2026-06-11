@@ -652,13 +652,26 @@ run(function()
 						end))
 					end
 					
-					for _, v in entitylib.getUpdateConnections(entity) do
-						table.insert(entity.Connections, v:Connect(function()
-							entity.Health = (char:GetAttribute('Health') or 100) + getShieldAttribute(char)
-							entity.MaxHealth = char:GetAttribute('MaxHealth') or 100
-							entitylib.Events.EntityUpdated:Fire(entity)
-						end))
-					end
+local updateConnections = entitylib.getUpdateConnections(entity)
+
+if type(updateConnections) == "table" then
+    for _, v in ipairs(updateConnections) do
+        if v and type(v.Connect) == "function" then
+            local connection = v:Connect(function()
+                entity.Health = (char:GetAttribute('Health') or 100) + getShieldAttribute(char)
+                entity.MaxHealth = char:GetAttribute('MaxHealth') or 100
+                entitylib.Events.EntityUpdated:Fire(entity)
+            end)
+            table.insert(entity.Connections, connection)
+        elseif type(v) == "boolean" then
+            warn("Skipping boolean value in updateConnections")
+        else
+            warn("Invalid connection object:", type(v))
+        end
+    end
+else
+    warn("getUpdateConnections did not return a table, got:", type(updateConnections))
+end
 
 					for _, v in updateobjects do
 						table.insert(entity.Connections, v:GetPropertyChangedSignal('Value'):Connect(function()
