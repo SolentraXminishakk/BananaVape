@@ -35,9 +35,7 @@ end
 
 local function downloadFile(path, func)
 	if not isfile(path) then
-		if not license.Closet then
-			print("[BananaVape] Downloading: " .. path)
-		end
+		print("[BananaVape] Downloaded: " .. path)
 		
 		local commitPath = 'bananavxpe/profiles/commit.txt'
 		local commit = 'main'
@@ -132,10 +130,6 @@ if not shared.VapeDeveloper then
 		if commit ~= 'main' and isfile('bananavxpe/profiles/commit.txt') then
 			shared.updated = currentCommit
 		end
-		-- wipeFolder('bananavxpe')
-		-- wipeFolder('bananavxpe/games')
-		-- wipeFolder('bananavxpe/guis')
-		-- wipeFolder('bananavxpe/libraries')
 	end
 	writefile('bananavxpe/profiles/commit.txt', commit)
 end
