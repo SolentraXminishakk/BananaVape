@@ -1602,7 +1602,7 @@ end))
 	end)
 end)
 
-for _, v in {'Anti Ragdoll', 'Trigger Bot', 'Silent Aim', 'Anti Fall', 'Auto Rejoin', 'Rejoin', 'Disabler', 'Timer', 'Server Hop', 'Mouse TP', 'Murder Mystery'} do
+for _, v in {'Anti Ragdoll', 'Trigger Bot', 'Silent Aim', 'Anti Fall', 'Auto Rejoin', 'Rejoin', 'Disabler', 'Timer', 'Staff Detector', 'Server Hop', 'Mouse TP', 'Murder Mystery'} do
 	vape:Remove(v)
 end
 
