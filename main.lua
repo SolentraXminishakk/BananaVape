@@ -1,5 +1,4 @@
 --!nocheck
--- CRITICAL FIX: Override readfile to NEVER return boolean
 local oldReadfile = readfile
 readfile = function(file)
     local result = oldReadfile(file)
