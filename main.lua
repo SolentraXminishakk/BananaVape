@@ -34,9 +34,19 @@ local function downloadFile(path, func)
         local relativePath = path:gsub('bananavxpe/', '')
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
         
+        task.wait(0.1)
+        
         local suc, res = pcall(function()
             return game:HttpGet(url, true)
         end)
+        
+        if not suc then
+            warn("[BananaVape] HttpGet failed, retrying... " .. tostring(res))
+            task.wait(0.5)
+            suc, res = pcall(function()
+                return game:HttpGet(url, true)
+            end)
+        end
         
         if not suc or res == '404: Not Found' then
             error(res or "Failed to download")
@@ -81,6 +91,7 @@ local function loadGameSpecificScript()
         
         local func, err = loadstring(scriptContent, scriptName)
         if not func then
+            warn("[BananaVape] Compile error: " .. tostring(err))
             return false
         end
         
@@ -90,7 +101,11 @@ local function loadGameSpecificScript()
         end
         
         success, result = pcall(func)
-        return success
+        if success then
+            return true
+        end
+        
+        return false
     end
     
     if isfile(gameScriptPath) then
@@ -115,6 +130,8 @@ local function loadGameSpecificScript()
         
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
         
+        task.wait(0.1)
+        
         local suc, res = pcall(function()
             return game:HttpGet(url, true)
         end)
@@ -130,6 +147,8 @@ local function loadGameSpecificScript()
                 print("[BananaVape] Downloaded and loaded game script")
                 return true
             end
+        else
+            print("[BananaVape] Game script not found on GitHub for PlaceId: " .. placeId)
         end
     end
     
@@ -203,6 +222,7 @@ local function initialize()
 end
 
 local success, err = xpcall(initialize, function(e)
+    warn("[BananaVape] Init error: " .. tostring(e))
     return e
 end)
 
