@@ -66,10 +66,10 @@ if not shared.VapeDeveloper then
 		if commit ~= 'main' and isfile('bananavxpe/profiles/commit.txt') then
 			shared.updated = readfile('bananavxpe/profiles/commit.txt')
 		end
-		wipeFolder('bananavxpe')
-		wipeFolder('bananavxpe/games')
-		wipeFolder('bananavxpe/guis')
-		wipeFolder('bananavxpe/libraries')
+        -- wipeFolder('bananavxpe')
+        -- wipeFolder('bananavxpe/games')
+        -- wipeFolder('bananavxpe/guis')
+        -- wipeFolder('bananavxpe/libraries')
 	end
 	writefile('bananavxpe/profiles/commit.txt', commit)
 end
