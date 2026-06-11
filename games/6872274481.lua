@@ -65,8 +65,6 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
-vape:CreateNotification("BananaVape", "Loaded!", 5, "info")
-
 local rankCache = {}
 local store = {
 	lastHit = 0,
