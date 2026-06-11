@@ -1,24 +1,4 @@
 --!nocheck
-local oldReadfile = readfile
-local oldIsfile = isfile
-
-readfile = function(file)
-    local result = oldReadfile(file)
-    if type(result) == "boolean" then
-        return ""
-    end
-    return result or ""
-end
-
-isfile = function(file)
-    local result = oldIsfile(file)
-    if type(result) == "boolean" then
-        return result
-    end
-    local content = readfile(file)
-    return content ~= nil and content ~= ""
-end
-
 local license = ... or {}
 license.Key = script_key or license.Key or nil
 
@@ -99,22 +79,7 @@ local function loadGameSpecificScript()
             return false
         end
         
-        -- INJECT THE FIX INTO EVERY SCRIPT
-        local fixed = [[
-local oldReadfile = readfile
-local oldIsfile = isfile
-readfile = function(f)
-    local r = oldReadfile(f)
-    return (type(r) == "string" and r) or ""
-end
-isfile = function(f)
-    local r = oldIsfile(f)
-    if type(r) == "boolean" then return r end
-    return readfile(f) ~= ""
-end
-]] .. scriptContent
-        
-        local func, err = loadstring(fixed, scriptName)
+        local func, err = loadstring(scriptContent, scriptName)
         if not func then
             return false
         end
@@ -214,11 +179,7 @@ local function initialize()
     if not shared.VapeIndependent then
         local universalContent = downloadFile('bananavxpe/games/universal.lua')
         if universalContent then
-            local fixed = [[
-local oldReadfile = readfile
-readfile = function(f) local r = oldReadfile(f); return (type(r) == "string" and r) or "" end
-]] .. universalContent
-            local universalFunc = loadstring(fixed, 'universal')
+            local universalFunc = loadstring(universalContent, 'universal')
             if universalFunc then
                 pcall(function() universalFunc(license) end)
             end
@@ -228,11 +189,7 @@ readfile = function(f) local r = oldReadfile(f); return (type(r) == "string" and
         
         local premiumContent = downloadFile('bananavxpe/libraries/premium.lua')
         if premiumContent then
-            local fixed = [[
-local oldReadfile = readfile
-readfile = function(f) local r = oldReadfile(f); return (type(r) == "string" and r) or "" end
-]] .. premiumContent
-            local premiumFunc = loadstring(fixed, 'premium')
+            local premiumFunc = loadstring(premiumContent, 'premium')
             if premiumFunc then
                 pcall(function() premiumFunc(license) end)
             end
