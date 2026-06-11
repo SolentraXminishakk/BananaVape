@@ -53,14 +53,12 @@ local redirect = function()
 	end
 end
 
--- Replace the entire downloadFile function in init.lua with this:
 local function downloadFile(path, func)
 	if not isfile(path) then
 		if not license.Closet then
 			print("[BananaVape] Downloading: " .. path)
 		end
 		
-		-- FIX: Ensure commit.txt exists and contains a valid string
 		local commitPath = 'bananavxpe/profiles/commit.txt'
 		if not isfile(commitPath) then
 			writefile(commitPath, 'main')
@@ -86,7 +84,6 @@ local function downloadFile(path, func)
 		
 		local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
 		
-		-- Validate URL before making request
 		if type(url) ~= "string" or url == "" then
 			error("Invalid URL generated: " .. tostring(url))
 		end
