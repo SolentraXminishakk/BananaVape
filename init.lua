@@ -1,25 +1,4 @@
 --!nocheck
--- FORCE OVERRIDE readfile BEFORE ANYTHING ELSE
-local oldReadfile = readfile
-local oldIsfile = isfile
-
-readfile = function(file)
-    local result = oldReadfile(file)
-    if type(result) == "boolean" then
-        return ""
-    end
-    return result or ""
-end
-
-isfile = function(file)
-    local result = oldIsfile(file)
-    if type(result) == "boolean" then
-        return result
-    end
-    local content = readfile(file)
-    return content ~= nil and content ~= ""
-end
-
 local license = ... or {}
 license.Key = script_key or license.Key
 
@@ -80,7 +59,6 @@ if not shared.VapeDeveloper then
     writefile('bananavxpe/profiles/commit.txt', commit)
 end
 
--- FIX: Write commit.txt if missing
 if not isfile('bananavxpe/profiles/commit.txt') then
     writefile('bananavxpe/profiles/commit.txt', 'main')
 end
