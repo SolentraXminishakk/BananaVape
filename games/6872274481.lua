@@ -10353,6 +10353,7 @@ run(function()
     local OldTheme
     local connections = {}
     local originalProperties = {}
+    local applying = false
 
     local skipMaterials = {
         [Enum.Material.Grass] = true,
@@ -10391,25 +10392,27 @@ run(function()
         lighting.ShadowSoftness = 0
 
         for _, effect in ipairs(lighting:GetChildren()) do
-            pcall(function()
-                effect.Enabled = false
-            end)
+            pcall(function() effect.Enabled = false end)
         end
 
-        local count = 0
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            pcall(degradePart, obj)
-            count += 1
-            if count % 100 == 0 then
-                task.wait()
-            end
-        end
-
-        table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
-            task.defer(function()
+        task.spawn(function()
+            local count = 0
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if not OldTheme.Enabled then return end
                 pcall(degradePart, obj)
-            end)
-        end))
+                count += 1
+                if count % 100 == 0 then
+                    task.wait()
+                end
+            end
+
+            if not OldTheme.Enabled then return end
+            table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
+                task.defer(function()
+                    pcall(degradePart, obj)
+                end)
+            end))
+        end)
     end
 
     local function removePotatoGraphics()
@@ -10421,40 +10424,40 @@ run(function()
         lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
 
         for _, effect in ipairs(lighting:GetChildren()) do
-            pcall(function()
-                effect.Enabled = true
-            end)
-        end
-
-        local count = 0
-        for part, props in pairs(originalProperties) do
-            pcall(function()
-                if typeof(part) == "Instance" and part:IsA("BasePart") then
-                    part.Material = props.Material
-                    part.CastShadow = props.CastShadow
-                    part.Reflectance = props.Reflectance
-                end
-            end)
-            count += 1
-            if count % 100 == 0 then
-                task.wait()
-            end
+            pcall(function() effect.Enabled = true end)
         end
 
         for _, conn in ipairs(connections) do
             conn:Disconnect()
         end
         connections = {}
-        originalProperties = {}
+
+        task.spawn(function()
+            local count = 0
+            for part, props in pairs(originalProperties) do
+                pcall(function()
+                    if typeof(part) == "Instance" and part:IsA("BasePart") then
+                        part.Material = props.Material
+                        part.CastShadow = props.CastShadow
+                        part.Reflectance = props.Reflectance
+                    end
+                end)
+                count += 1
+                if count % 100 == 0 then
+                    task.wait()
+                end
+            end
+            originalProperties = {}
+        end)
     end
 
     OldTheme = vape.Categories.World:CreateModule({
         Name = 'OldTheme',
         Function = function(callback)
             if callback then
-                pcall(applyPotatoGraphics)
+                applyPotatoGraphics()
             else
-                pcall(removePotatoGraphics)
+                removePotatoGraphics()
             end
         end,
         Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
