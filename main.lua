@@ -36,7 +36,7 @@ local function downloadFile(path, func)
         
         local res = game:HttpGet(url)
         
-        if res == '404: Not Found' then -- worst error in the history of errors
+        if res == '404: Not Found' then
             error("Failed to download: " .. path)
         end
         
@@ -84,14 +84,10 @@ local function loadGameSpecificScript()
         end
         
         local success, result = pcall(func, license)
-        if success then
-            return true
-        end
+        if success then return true end
         
         success, result = pcall(func)
-        if success then
-            return true
-        end
+        if success then return true end
         
         return false
     end
@@ -99,8 +95,7 @@ local function loadGameSpecificScript()
     if isfile(gameScriptPath) then
         local scriptContent = readfile(gameScriptPath)
         if type(scriptContent) == "string" and #scriptContent > 10 then
-            local success = executeScript(scriptContent, tostring(placeId))
-            if success then
+            if executeScript(scriptContent, tostring(placeId)) then
                 print("[BananaVape] Game script loaded")
                 return true
             end
@@ -112,12 +107,11 @@ local function loadGameSpecificScript()
         if isfile('bananavxpe/profiles/commit.txt') then
             local commitContent = readfile('bananavxpe/profiles/commit.txt')
             if type(commitContent) == "string" and commitContent ~= "" then
-                commit = commitContent
+                commit = commitContent:gsub("%s+", "")
             end
         end
         
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
-        
         task.wait(0.1)
         
         local suc, res = pcall(function()
@@ -130,13 +124,12 @@ local function loadGameSpecificScript()
             end
             writefile(gameScriptPath, res)
             
-            local success = executeScript(res, tostring(placeId))
-            if success then
+            if executeScript(res, tostring(placeId)) then
                 print("[BananaVape] Downloaded and loaded script")
                 return true
             end
         else
-            print("[BananaVape] script not found for PlaceId: " .. placeId)
+            print("[BananaVape] Script not found for PlaceId: " .. placeId)
         end
     end
     
@@ -183,7 +176,7 @@ local function initialize()
     _G.vape = vape
     shared.vape = vape
 
-    if not shared.VapeIndependent then
+    if not shared.VapeIndependent then  -- ← this block was never closed
         local universalContent = downloadFile('bananavxpe/games/universal.lua')
         if universalContent then
             local universalFunc = loadstring(universalContent, 'universal')
@@ -201,8 +194,7 @@ local function initialize()
                 pcall(function() premiumFunc(license) end)
             end
         end
-        
-    finishLoading()
+    end
 end
 
 local success, err = xpcall(initialize, function(e)
