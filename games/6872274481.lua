@@ -1373,25 +1373,19 @@ run(function()
 	end)
 
 	local kills = sessioninfo:AddItem('Kills')
+	local finalKills = sessioninfo:AddItem('Final Kills')
 	local beds = sessioninfo:AddItem('Beds')
 	local wins = sessioninfo:AddItem('Wins')
 	local games = sessioninfo:AddItem('Games')
 	local global_time = sessioninfo:AddItem('Current Time')
-		
+	
 task.spawn(function()
     while true do
-        local seconds = tick() % 86400
-        local hours = math.floor(seconds / 3600) % 24
-        local minutes = math.floor((seconds % 3600) / 60)
-        local secs = math.floor(seconds % 60)
-        local ampm = hours >= 12 and "PM" or "AM"
-        hours = hours % 12
-        hours = hours == 0 and 12 or hours
-        global_time:SetValue(string.format("%02d:%02d:%02d %s", hours, minutes, secs, ampm))
+        global_time.Value = os.date("%I:%M:%S %p")
         task.wait(1)
     end
 end)
-
+	
 	local mapname = 'Unknown'
 	sessioninfo:AddItem('Map', 0, function()
 		return mapname
@@ -1454,6 +1448,43 @@ end)
 			kills:Increment()
 		end
 	end))
+
+	local finalKillCount = 0
+
+	vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
+    local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
+    local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
+    if not killed or not killer then return end
+    
+    if killed ~= lplr and killer == lplr then
+        kills:Increment()
+        
+        local isFinalKill = false
+        
+        local killedTeam = killed:GetAttribute('Team')
+        if killedTeam then
+            for _, bed in collectionService:GetTagged('bed') do
+                if bed:GetAttribute('TeamId') == killedTeam and bed:GetAttribute('NoBreak') == false then
+                    isFinalKill = true
+                    break
+                end
+            end
+        end
+        
+        if not isFinalKill and killed:GetAttribute('Eliminated') == true then
+            isFinalKill = true
+        end
+        
+        if not isFinalKill and store.matchState == 2 then
+            isFinalKill = true
+        end
+        
+        if isFinalKill then
+            finalKillCount = finalKillCount + 1
+            finalKills.Value = finalKillCount
+        end
+    end
+end))
 
 	task.spawn(function()
 		local rayParams = RaycastParams.new()
