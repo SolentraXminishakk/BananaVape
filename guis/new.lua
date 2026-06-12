@@ -6162,14 +6162,14 @@ general:CreateButton({
 	Tooltip = 'This will set your profile to the default settings of Vape'
 })
 general:CreateButton({
-	Name = 'Self destruct',
+	Name = 'Self-Destruct',
 	Function = function()
 		mainapi:Uninject()
 	end,
-	Tooltip = 'Removes vape from the current game'
+	Tooltip = 'Removes bananavape from the current game'
 })
 general:CreateButton({
-	Name = 'Reinject',
+	Name = 'Re-Inject',
 	Function = function()
 		shared.vapereload = true
 		if shared.VapeDeveloper then
@@ -6178,7 +6178,7 @@ general:CreateButton({
 			loadstring(game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/init.lua', true))()
 		end
 	end,
-	Tooltip = 'Reloads vape for debugging purposes'
+	Tooltip = 'Reloads bananavape for debugging purposes'
 })
 
 --[[
