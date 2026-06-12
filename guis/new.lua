@@ -1,3 +1,4 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 local license = ... or {}
 local mainapi = {
 	Categories = {},
@@ -6175,7 +6176,7 @@ general:CreateButton({
 		if shared.VapeDeveloper then
 			loadstring(readfile('bananavxpe/loader.lua'), 'loader')()
 		else
-			loadstring(game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/loader.lua', true))()
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/init.lua', true))()
 		end
 	end,
 	Tooltip = 'Reloads vape for debugging purposes'
