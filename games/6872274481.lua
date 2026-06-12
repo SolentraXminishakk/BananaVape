@@ -10631,9 +10631,33 @@ run(function()
 end)
 
 run(function()
-    local old
     local connections = {}
     local originalProperties = {}
+
+    -- Materials that break visually when forced to SmoothPlastic
+    local skipMaterials = {
+        [Enum.Material.Grass] = true,
+        [Enum.Material.LeafyGrass] = true,
+        [Enum.Material.Leaves] = true,
+        [Enum.Material.Foliage] = true,
+    }
+
+    local function degradePart(part)
+        if part:IsA("BasePart") then
+            originalProperties[part] = {
+                Material = part.Material,
+                CastShadow = part.CastShadow,
+                Reflectance = part.Reflectance,
+            }
+            part.CastShadow = false
+            part.Reflectance = 0
+
+            -- Don't touch material on leafy/grassy parts or they go white
+            if not skipMaterials[part.Material] then
+                part.Material = Enum.Material.SmoothPlastic
+            end
+        end
+    end
 
     local function applyPotatoGraphics()
         local lighting = game:GetService("Lighting")
@@ -10658,19 +10682,6 @@ run(function()
         end
 
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-
-        local function degradePart(part)
-            if part:IsA("BasePart") then
-                originalProperties[part] = {
-                    Material = part.Material,
-                    CastShadow = part.CastShadow,
-                    Reflectance = part.Reflectance,
-                }
-                part.Material = Enum.Material.SmoothPlastic
-                part.CastShadow = false
-                part.Reflectance = 0
-            end
-        end
 
         for _, obj in ipairs(workspace:GetDescendants()) do
             degradePart(obj)
