@@ -1376,6 +1376,39 @@ run(function()
 	local beds = sessioninfo:AddItem('Beds')
 	local wins = sessioninfo:AddItem('Wins')
 	local games = sessioninfo:AddItem('Games')
+	local global_time = sessioninfo:AddItem('Current Time')
+	
+	local use24Hour = false
+
+	task.spawn(function()
+   		while true do
+        	local success, timeStr = pcall(function()
+            	if use24Hour then
+                	return os.date("%H:%M:%S")
+            	else
+                	return os.date("%I:%M:%S %p")
+            	end
+        	end)
+        	if success and timeStr and timeStr ~= "00:00:00" and timeStr ~= "" then
+            	global_time.Value = timeStr
+        	else
+            	local seconds = tick() % 86400
+            	local hours = math.floor(seconds / 3600) % 24
+            	local minutes = math.floor((seconds % 3600) / 60)
+            	local secs = math.floor(seconds % 60)
+            	if use24Hour then
+                	timeStr = string.format("%02d:%02d:%02d", hours, minutes, secs)
+           		else
+                	local ampm = hours >= 12 and "PM" or "AM"
+                	hours = hours % 12
+                	hours = hours == 0 and 12 or hours
+                	timeStr = string.format("%02d:%02d:%02d %s", hours, minutes, secs, ampm)
+            	end
+            	global_time.Value = timeStr
+        	end
+        	task.wait(1)
+    	end
+	end)
 
 	local mapname = 'Unknown'
 	sessioninfo:AddItem('Map', 0, function()
