@@ -1372,117 +1372,99 @@ run(function()
 		end
 	end)
 
-	local kills = sessioninfo:AddItem('Kills')
-	local finalKills = sessioninfo:AddItem('Final Kills')
-	local beds = sessioninfo:AddItem('Beds')
-	local wins = sessioninfo:AddItem('Wins')
-	local games = sessioninfo:AddItem('Games')
-	local global_time = sessioninfo:AddItem('Current Time')
-	
-task.spawn(function()
-    while true do
-        global_time.Value = os.date("%I:%M:%S %p")
-        task.wait(1)
-    end
+local kills = sessioninfo:AddItem('Kills')
+local finalKills = sessioninfo:AddItem('Final Kills')
+local beds = sessioninfo:AddItem('Beds')
+local wins = sessioninfo:AddItem('Wins')
+local games = sessioninfo:AddItem('Games')
+
+sessioninfo:AddItem('Current Time', 0, function()
+    return os.date("%I:%M:%S %p")
+end, true)
+
+local mapname = 'Unknown'
+sessioninfo:AddItem('Map', 0, function()
+    return mapname
+end, false)
+
+task.delay(1, function()
+    games:Increment()
 end)
-	
-	local mapname = 'Unknown'
-	sessioninfo:AddItem('Map', 0, function()
-		return mapname
-	end, false)
 
-	task.delay(1, function()
-		games:Increment()
-	end)
+task.spawn(function()
+    pcall(function()
+        repeat task.wait() until store.matchState ~= 0 or vape.Loaded == nil
+        if vape.Loaded == nil then return end
+        store.map = waitForChildYield(workspace, 9e9, 'Map', 'Worlds'):GetChildren()[1]
+        mapname = store.map.Name
+        mapname = string.gsub(string.split(mapname, '_')[2] or mapname, '-', '') or 'Blank'
+        if store.map then
+            vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v)
+                task.delay(0, function()
+                    if v:GetAttribute('Block') and (v:GetAttribute('PlacedByUserId') or 0) ~= 0 then
+                        local data = {
+                            blockRef = {
+                                blockPosition = v.Position / 3,
+                            },
+                            player = playersService:GetPlayerByUserId(v:GetAttribute('PlacedByUserId')),
+                        }
+                        for i, v in cache do
+                            if ((data.blockRef.blockPosition * 3) - v[1]).Magnitude <= 30 then
+                                table.clear(v[3])
+                                table.clear(v)
+                                cache[i] = nil
+                            end
+                        end
+                        vapeEvents.PlaceBlockEvent:Fire(data)
+                    end
+                end)
+            end))
+        end
+    end)
+end)
 
-	task.spawn(function()
-		pcall(function()
-			repeat task.wait() until store.matchState ~= 0 or vape.Loaded == nil
-			if vape.Loaded == nil then return end
-			store.map = waitForChildYield(workspace, 9e9, 'Map', 'Worlds'):GetChildren()[1]
-			mapname = store.map.Name
-			mapname = string.gsub(string.split(mapname, '_')[2] or mapname, '-', '') or 'Blank'
-			if store.map then
-				vape:Clean(store.map.Blocks.ChildAdded:Connect(function(v) -- bedwars game is so bad bro 😭 how did you even break this event
-					task.delay(0, function()
-						if v:GetAttribute('Block') and (v:GetAttribute('PlacedByUserId') or 0) ~= 0 then
-							local data = {
-								blockRef = {
-									blockPosition = v.Position / 3,
-								},
-								player = playersService:GetPlayerByUserId(v:GetAttribute('PlacedByUserId')),
-							}
-							for i, v in cache do
-								if ((data.blockRef.blockPosition * 3) - v[1]).Magnitude <= 30 then
-									table.clear(v[3])
-									table.clear(v)
-									cache[i] = nil
-								end
-							end
-							vapeEvents.PlaceBlockEvent:Fire(data)
-						end
-					end)
-				end))
-			end
-		end)
-	end)
+vape:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
+    if bedTable.player and bedTable.player.UserId == lplr.UserId then
+        beds:Increment()
+    end
+end))
 
-	vape:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(bedTable)
-		if bedTable.player and bedTable.player.UserId == lplr.UserId then
-			beds:Increment()
-		end
-	end))
+vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
+    if (bedwars.Store:getState().Game.myTeam or {}).id == winTable.winningTeamId or lplr.Neutral then
+        wins:Increment()
+    end
+end))
 
-	vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
-		if (bedwars.Store:getState().Game.myTeam or {}).id == winTable.winningTeamId or lplr.Neutral then
-			wins:Increment()
-		end
-	end))
-
-	vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
-		local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
-		local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
-		if not killed or not killer then return end
-
-		if killed ~= lplr and killer == lplr then
-			kills:Increment()
-		end
-	end))
-
-	local finalKillCount = 0
-
-	vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
+vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
     local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
     local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
     if not killed or not killer then return end
-    
-    if killed ~= lplr and killer == lplr then
-        kills:Increment()
-        
-        local isFinalKill = false
-        
-        local killedTeam = killed:GetAttribute('Team')
-        if killedTeam then
-            for _, bed in collectionService:GetTagged('bed') do
-                if bed:GetAttribute('TeamId') == killedTeam and bed:GetAttribute('NoBreak') == false then
-                    isFinalKill = true
-                    break
-                end
+    if killed == lplr or killer ~= lplr then return end
+
+    kills:Increment()
+
+    local isFinalKill = false
+
+    local killedTeam = killed:GetAttribute('Team')
+    if killedTeam then
+        for _, bed in collectionService:GetTagged('bed') do
+            if bed:GetAttribute('TeamId') == killedTeam and bed:GetAttribute('NoBreak') == false then
+                isFinalKill = true
+                break
             end
         end
-        
-        if not isFinalKill and killed:GetAttribute('Eliminated') == true then
-            isFinalKill = true
-        end
-        
-        if not isFinalKill and store.matchState == 2 then
-            isFinalKill = true
-        end
-        
-        if isFinalKill then
-            finalKillCount = finalKillCount + 1
-            finalKills.Value = finalKillCount
-        end
+    end
+
+    if not isFinalKill and killed:GetAttribute('Eliminated') == true then
+        isFinalKill = true
+    end
+
+    if not isFinalKill and store.matchState == 2 then
+        isFinalKill = true
+    end
+
+    if isFinalKill then
+        finalKills:Increment()
     end
 end))
 
