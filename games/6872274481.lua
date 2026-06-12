@@ -1377,7 +1377,8 @@ local finalKills = sessioninfo:AddItem('Final Kills')
 local beds = sessioninfo:AddItem('Beds')
 local wins = sessioninfo:AddItem('Wins')
 local games = sessioninfo:AddItem('Games')
-
+local killstreak = sessioninfo:AddItem('Killstreak')
+		
 sessioninfo:AddItem('Current Time', 0, function()
     return os.date("%I:%M:%S %p")
 end, true)
@@ -1436,12 +1437,20 @@ vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
 end))
 
 vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
+    local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
+    if killed and killed == lplr then
+        killstreak.Value = 0
+    end
+end))
+
+vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
     local killer = playersService:GetPlayerFromCharacter(deathTable.fromEntity)
     local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
     if not killed or not killer then return end
     if killed == lplr or killer ~= lplr then return end
 
     kills:Increment()
+    killstreak:Increment()
 
     local isFinalKill = false
     local killedTeam = killed:GetAttribute('Team')
