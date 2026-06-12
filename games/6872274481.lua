@@ -10631,35 +10631,12 @@ run(function()
 end)
 
 run(function()
+    local old
     local connections = {}
     local originalProperties = {}
 
-    -- Materials that break visually when forced to SmoothPlastic
-    local skipMaterials = {
-        [Enum.Material.Grass] = true,
-        [Enum.Material.LeafyGrass] = true,
-        [Enum.Material.Leaves] = true,
-        [Enum.Material.Foliage] = true,
-    }
-
-    local function degradePart(part)
-        if part:IsA("BasePart") then
-            originalProperties[part] = {
-                Material = part.Material,
-                CastShadow = part.CastShadow,
-                Reflectance = part.Reflectance,
-            }
-            part.CastShadow = false
-            part.Reflectance = 0
-
-            -- Don't touch material on leafy/grassy parts or they go white
-            if not skipMaterials[part.Material] then
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-    end
-
     local function applyPotatoGraphics()
+        -- Lighting settings for washed out/old look
         local lighting = game:GetService("Lighting")
         originalProperties.Brightness = lighting.Brightness
         originalProperties.Ambient = lighting.Ambient
@@ -10675,24 +10652,44 @@ run(function()
         lighting.GlobalShadows = false
         lighting.ShadowSoftness = 0
 
+        -- Remove all post-processing effects
         for _, effect in ipairs(lighting:GetChildren()) do
             if effect:IsA("PostEffect") then
                 effect.Enabled = false
             end
         end
 
+        -- Lower render quality
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 
+        -- Flatten/degrade all BaseParts in workspace
+        local function degradePart(part)
+            if part:IsA("BasePart") then
+                -- Save original material
+                originalProperties[part] = {
+                    Material = part.Material,
+                    CastShadow = part.CastShadow,
+                    Reflectance = part.Reflectance,
+                }
+                part.Material = Enum.Material.SmoothPlastic
+                part.CastShadow = false
+                part.Reflectance = 0
+            end
+        end
+
+        -- Apply to all existing parts
         for _, obj in ipairs(workspace:GetDescendants()) do
             degradePart(obj)
         end
 
+        -- Apply to newly added parts
         table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
             degradePart(obj)
         end))
     end
 
     local function removePotatoGraphics()
+        -- Restore lighting
         local lighting = game:GetService("Lighting")
         lighting.Brightness = originalProperties.Brightness or 2
         lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
@@ -10701,14 +10698,17 @@ run(function()
         lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
         lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
 
+        -- Re-enable post effects
         for _, effect in ipairs(lighting:GetChildren()) do
             if effect:IsA("PostEffect") then
                 effect.Enabled = true
             end
         end
 
+        -- Restore render quality
         settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
 
+        -- Restore all parts
         for part, props in pairs(originalProperties) do
             if typeof(part) == "Instance" and part:IsA("BasePart") then
                 part.Material = props.Material
@@ -10717,6 +10717,7 @@ run(function()
             end
         end
 
+        -- Disconnect listeners
         for _, conn in ipairs(connections) do
             conn:Disconnect()
         end
