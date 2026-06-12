@@ -1436,11 +1436,18 @@ vape:Clean(vapeEvents.MatchEndEvent.Event:Connect(function(winTable)
     end
 end))
 
-vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
-    local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
-    if killed and killed == lplr then
-        killstreak.Value = 0
+    local humanoid = lplr.Character and lplr.Character:FindFirstChildOfClass('Humanoid')
+    if humanoid then
+        vape:Clean(humanoid.Died:Connect(function()
+            killstreak.Value = 0
+        end))
     end
+
+vape:Clean(lplr.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild('Humanoid')
+    vape:Clean(humanoid.Died:Connect(function()
+        killstreak.Value = 0
+    end))
 end))
 
 vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
