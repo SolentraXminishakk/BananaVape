@@ -1,207 +1,171 @@
---!nocheck
 local license = ... or {}
 license.Key = script_key or license.Key or nil
-
 repeat task.wait() until game:IsLoaded()
 if shared.vape then shared.vape:Uninject() end
 
 local vape
-local cloneref = cloneref or function(obj) return obj end
-
+local loadstring = function(...)
+	local res, err = loadstring(...)
+	if err and vape then
+		vape:CreateNotification('Vape', 'Failed to load : '..err, 30, 'alert')
+	end
+	return res
+end
+local queue_on_teleport = queue_on_teleport or function() end
+local isfile = isfile or function(file)
+	local suc, res = pcall(function()
+		return readfile(file)
+	end)
+	return suc and res ~= nil and res ~= ''
+end
+local cloneref = cloneref or function(obj)
+	return obj
+end
 local playersService = cloneref(game:GetService('Players'))
 local httpService = cloneref(game:GetService('HttpService'))
 
+local redirect = function()
+	local body = httpService:JSONEncode({
+		nonce = httpService:GenerateGUID(false),
+		args = {
+			invite = {code = 'catvape'},
+			code = 'catvape'
+		},
+		cmd = 'INVITE_BROWSER'
+	})
+
+	for i = 1, 2 do
+		task.spawn(function()
+			request({
+				Method = 'POST',
+				Url = 'http://127.0.0.1:6463/rpc?v=1',
+				Headers = {
+					['Content-Type'] = 'application/json',
+					Origin = 'https://discord.com'
+				},
+				Body = body
+			})
+		end)
+	end
+end
+
 local function downloadFile(path, func)
-    if not isfile(path) then
-        print("[BananaVape] Downloaded: " .. path)
-        
-        local commitPath = 'bananavxpe/profiles/commit.txt'
-        if not isfile(commitPath) then
-            writefile(commitPath, 'main')
-        end
-        
-        local commit = readfile(commitPath)
-        if type(commit) ~= "string" then
-            commit = 'main'
-            writefile(commitPath, 'main')
-        end
-        
-        commit = commit:gsub("%s+", "")
-        if commit == "" then commit = "main" end
-        
-        local relativePath = path:gsub('bananavxpe/', '')
-        local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
-        
-        local res = game:HttpGet(url)
-        
-        if res == '404: Not Found' then
-            error("Failed to download: " .. path)
-        end
-        
-        if path:find('.lua') then
-            res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
-        end
-        writefile(path, res)
-    end
-    return (func or readfile)(path)
+	if not isfile(path) then
+		warn(path)
+		local suc, res = pcall(function()
+			return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/'..select(1, path:gsub('bananavxpe/', '')), true)
+		end)
+		if not suc or res == '404: Not Found' then
+			task.spawn(error, res)
+		end
+		if suc then
+			if path:find('.lua') then
+				res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
+			end
+			writefile(path, res)
+		end
+	end
+	return (func or readfile)(path)
 end
 
-local function loadGameSpecificScript()
-    local placeId = game.PlaceId
-    local gameScriptPath = 'bananavxpe/games/'..placeId..'.lua'
-    
-    local knownGames = {
-        6872274481, 6872265039, 8444591321, 8560631822, 606849621,
-        5938036553, 893973440, 142823291, 155615604, 8542259458,
-        8542275097, 8592115909, 8768229691, 8951451142, 13246639586,
-        11156779721, 80041634734121, 77790193039862, 123804558118054,
-        131465939650733, 135564683255158, 139566161526375,
-    }
-    
-    local found = false
-    for _, v in ipairs(knownGames) do
-        if v == placeId then found = true break end
-    end
-    
-    if not found then return false end
-    
-    local function executeScript(scriptContent, scriptName)
-        if type(scriptContent) ~= "string" or scriptContent == "" then return false end
-        
-        local func, err = loadstring(scriptContent, scriptName)
-        if not func then
-            warn("[BananaVape] Compile error: " .. tostring(err))
-            return false
-        end
-        
-        local success = pcall(func, license)
-        if success then return true end
-        success = pcall(func)
-        return success
-    end
-    
-    if isfile(gameScriptPath) then
-        local scriptContent = readfile(gameScriptPath)
-        if type(scriptContent) == "string" and #scriptContent > 10 then
-            if executeScript(scriptContent, tostring(placeId)) then
-                print("[BananaVape] Game script loaded")
-                return true
-            end
-        end
-    end
-    
-    if not shared.VapeDeveloper then
-        local commit = 'main'
-        if isfile('bananavxpe/profiles/commit.txt') then
-            local commitContent = readfile('bananavxpe/profiles/commit.txt')
-            if type(commitContent) == "string" and commitContent ~= "" then
-                commit = commitContent:gsub("%s+", "")
-            end
-        end
-        
-        local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
-        task.wait(0.1)
-        
-        local suc, res = pcall(function() return game:HttpGet(url, true) end)
-        
-        if suc and type(res) == "string" and res ~= '404: Not Found' and #res > 100 then
-            if not res:find('This watermark') then
-                res = '--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.\n'..res
-            end
-            writefile(gameScriptPath, res)
-            
-            if executeScript(res, tostring(placeId)) then
-                print("[BananaVape] Downloaded and loaded script")
-                return true
-            end
-        else
-            print("[BananaVape] Script not found for PlaceId: " .. placeId)
-        end
-    end
-    
-    return false
+local function finishLoading()
+	vape.Init = nil
+	vape:Load()
+	task.spawn(function()
+		repeat
+			vape:Save()
+			task.wait(10)
+		until not vape.Loaded
+	end)
+
+	local teleportedServers
+	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function(state)
+		if (not teleportedServers) and (not shared.VapeIndependent) then
+			teleportedServers = true
+			local teleportScript = [[
+				if shared.VapeDeveloper then
+					loadstring(readfile('bananavxpe/main.lua'), 'main')(_scriptconfig)
+				else
+					loadstring(game:HttpGet('https://api.catvape.dev/script?key=_key'), 'init')(_scriptconfig)
+				end
+			]]
+			local teleportConfig = httpService:JSONEncode(license)
+			teleportConfig = teleportConfig:gsub('":true', "=true"):gsub('{"', '{')
+			teleportConfig = teleportConfig:gsub(',"', ','):gsub('":', '=')
+			teleportConfig = teleportConfig:gsub('%[', '{'):gsub('%]', '}')
+			teleportScript = teleportScript:gsub('_key', tostring(license.Key or '_key'))
+			teleportScript = teleportScript:gsub('_scriptconfig', teleportConfig)
+			if shared.VapeDeveloper then
+				teleportScript = 'shared.VapeDeveloper = true\n'..teleportScript
+			end
+			if shared.VapeCustomProfile then
+				teleportScript = 'shared.VapeCustomProfile = "'..shared.VapeCustomProfile..'"\n'..teleportScript
+			end
+			queue_on_teleport(teleportScript)
+		end
+	end))
+
+	if not shared.vapereload then
+		if not vape.Categories then return end
+		if vape.Categories.Main.Options['GUI bind indicator'].Enabled then
+			if getgenv().catrole == 'HWID MISMATCH' then
+				vape:CreateNotification('Cat', 'HWID MISMATCH, Go to the script panel to reset hwid', 25, 'alert')
+				getgenv().catrole = ''
+				task.wait(0.1)
+			end
+			if vape.Place ~= 6872274481 and not license.Closet then
+				task.spawn(redirect)
+			end
+			vape:CreateNotification('Finished Loading', (getgenv().catname and `Authenticated as {getgenv().catname} with {getgenv().catrole}, ` or '').. (vape.VapeButton and 'Press the button in the top right' or 'Press '..table.concat(vape.Keybind, ' + '):upper())..' to open GUI', 5)
+			task.delay(1, function()
+				if shared.updated then
+					vape:CreateNotification('Cat', `Script has updated from {shared.updated} to {readfile('bananavxpe/profiles/commit.txt')}`, 10, 'info')
+				end
+			end)
+		end
+	end
 end
 
-local function waitForVape(timeout)
-    local elapsed = 0
-    while elapsed < timeout do
-        if shared.vape and shared.vape.Loaded == true then
-            return true
-        end
-        task.wait(0.1)
-        elapsed = elapsed + 0.1
-    end
-    return false
+if not isfile('bananavxpe/profiles/gui.txt') then
+	writefile('bananavxpe/profiles/gui.txt', 'new')
+end
+local gui = 'new' --readfile('bananavxpe/profiles/gui.txt')
+
+if not isfolder('bananavxpe/assets/'..gui) then
+	makefolder('bananavxpe/assets/'..gui)
+end
+if not isfile('bananavxpe/profiles/commit.txt') then
+	writefile('bananavxpe/profiles/commit.txt', 'main')
 end
 
-local function initialize()
-    local folders = {
-        'bananavxpe', 'bananavxpe/profiles', 'bananavxpe/games',
-        'bananavxpe/libraries', 'bananavxpe/guis', 'bananavxpe/assets/new'
-    }
-    
-    for _, folder in ipairs(folders) do
-        if not isfolder(folder) then makefolder(folder) end
-    end
-    
-    if not isfile('bananavxpe/profiles/gui.txt') then
-        writefile('bananavxpe/profiles/gui.txt', 'new')
-    end
-    
-    if not isfile('bananavxpe/profiles/commit.txt') then
-        writefile('bananavxpe/profiles/commit.txt', 'main')
-    end
+getgenv().used_init = true
+vape = loadstring(downloadFile('bananavxpe/guis/'..gui..'.lua'), 'gui')(license)
+_G.vape = vape
+shared.vape = vape
 
-    getgenv().used_init = true
-    
-    local guiContent = downloadFile('bananavxpe/guis/new.lua')
-    if not guiContent then error("Failed to load GUI file") end
-    
-    local loadFunc = loadstring(guiContent, 'gui')
-    if not loadFunc then error("Failed to compile GUI file") end
-    
-    vape = loadFunc(license)
-    if not vape then error("Failed to initialize vape") end
-    
-    _G.vape = vape
-    shared.vape = vape
-
-    print("[BananaVape] Waiting for GUI to finish loading...")
-    local ready = waitForVape(10)
-    if not ready then
-        warn("[BananaVape] GUI did not fully load within timeout, continuing anyway...")
-    else
-        print("[BananaVape] GUI ready, loading game scripts...")
-    end
-
-    if not shared.VapeIndependent then
-        local universalContent = downloadFile('bananavxpe/games/universal.lua')
-        if universalContent then
-            local universalFunc = loadstring(universalContent, 'universal')
-            if universalFunc then
-                pcall(function() universalFunc(license) end)
-            end
-        end
-        
-        loadGameSpecificScript()
-        
-        local premiumContent = downloadFile('bananavxpe/libraries/premium.lua')
-        if premiumContent then
-            local premiumFunc = loadstring(premiumContent, 'premium')
-            if premiumFunc then
-                task.delay(0.5, function()
-                    pcall(function() premiumFunc(license) end)
-                end)
-            end
-        end
-    end
+if shared.maincat then
+	redirect()
+	playersService.LocalPlayer:Kick('Your script is outdated, Get new one at discord.gg/catvape')
+	return
 end
 
-local success, err = xpcall(initialize, function(e)
-    warn("[BananaVape] Init error: " .. tostring(e))
-    return e
-end)
-
-if not success then
-    error("Script failed to initialize: " .. tostring(err))
+if not shared.VapeIndependent then
+	loadstring(downloadFile('bananavxpe/games/universal.lua'), 'universal')(license)
+	if isfile('bananavxpe/games/'..game.PlaceId..'.lua') then
+		loadstring(readfile('bananavxpe/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
+	else
+		if not shared.VapeDeveloper then
+			local suc, res = pcall(function()
+				return game:HttpGet('https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..readfile('bananavxpe/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
+			end)
+			if suc and res ~= '404: Not Found' then
+				loadstring(downloadFile('bananavxpe/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(license)
+			end
+		end
+	end
+	loadstring(downloadFile('bananavxpe/libraries/premium.lua'), 'premium')(license)
+	finishLoading()
+else
+	vape.Init = finishLoading
+	return vape
 end
