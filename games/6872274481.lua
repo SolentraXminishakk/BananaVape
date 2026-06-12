@@ -3200,7 +3200,7 @@ run(function()
     local Targets
     local Range
     
-    ArmorSwitch = vape.Categories.World:CreateModule({
+    ArmorSwitch = vape.Categories.Blatent:CreateModule({
         Name = 'Armor Switch',
         Function = function(callback)
             if callback then
