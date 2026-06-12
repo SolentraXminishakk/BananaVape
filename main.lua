@@ -27,9 +27,7 @@ local function downloadFile(path, func)
         end
         
         commit = commit:gsub("%s+", "")
-        if commit == "" then
-            commit = "main"
-        end
+        if commit == "" then commit = "main" end
         
         local relativePath = path:gsub('bananavxpe/', '')
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/' .. commit .. '/' .. relativePath
@@ -62,20 +60,13 @@ local function loadGameSpecificScript()
     
     local found = false
     for _, v in ipairs(knownGames) do
-        if v == placeId then
-            found = true
-            break
-        end
+        if v == placeId then found = true break end
     end
     
-    if not found then
-        return false
-    end
+    if not found then return false end
     
     local function executeScript(scriptContent, scriptName)
-        if type(scriptContent) ~= "string" or scriptContent == "" then
-            return false
-        end
+        if type(scriptContent) ~= "string" or scriptContent == "" then return false end
         
         local func, err = loadstring(scriptContent, scriptName)
         if not func then
@@ -83,13 +74,10 @@ local function loadGameSpecificScript()
             return false
         end
         
-        local success, result = pcall(func, license)
+        local success = pcall(func, license)
         if success then return true end
-        
-        success, result = pcall(func)
-        if success then return true end
-        
-        return false
+        success = pcall(func)
+        return success
     end
     
     if isfile(gameScriptPath) then
@@ -114,9 +102,7 @@ local function loadGameSpecificScript()
         local url = 'https://raw.githubusercontent.com/SolentraXminishakk/BananaVape/'..commit..'/games/'..placeId..'.lua'
         task.wait(0.1)
         
-        local suc, res = pcall(function()
-            return game:HttpGet(url, true)
-        end)
+        local suc, res = pcall(function() return game:HttpGet(url, true) end)
         
         if suc and type(res) == "string" and res ~= '404: Not Found' and #res > 100 then
             if not res:find('This watermark') then
@@ -136,6 +122,20 @@ local function loadGameSpecificScript()
     return false
 end
 
+local function waitForVape(timeout)
+    local elapsed = 0
+    while elapsed < timeout do
+        if shared.vape and type(shared.vape) == "table" then
+            if type(shared.vape.Uninject) == "function" then
+                return true
+            end
+        end
+        task.wait(0.1)
+        elapsed = elapsed + 0.1
+    end
+    return false
+end
+
 local function initialize()
     local folders = {
         'bananavxpe', 'bananavxpe/profiles', 'bananavxpe/games',
@@ -143,9 +143,7 @@ local function initialize()
     }
     
     for _, folder in ipairs(folders) do
-        if not isfolder(folder) then
-            makefolder(folder)
-        end
+        if not isfolder(folder) then makefolder(folder) end
     end
     
     if not isfile('bananavxpe/profiles/gui.txt') then
@@ -159,24 +157,26 @@ local function initialize()
     getgenv().used_init = true
     
     local guiContent = downloadFile('bananavxpe/guis/new.lua')
-    if not guiContent then
-        error("Failed to load GUI file")
-    end
+    if not guiContent then error("Failed to load GUI file") end
     
     local loadFunc = loadstring(guiContent, 'gui')
-    if not loadFunc then
-        error("Failed to compile GUI file")
-    end
+    if not loadFunc then error("Failed to compile GUI file") end
     
     vape = loadFunc(license)
-    if not vape then
-        error("Failed to initialize vape")
-    end
+    if not vape then error("Failed to initialize vape") end
     
     _G.vape = vape
     shared.vape = vape
 
-    if not shared.VapeIndependent then  -- ← this block was never closed
+    print("[BananaVape] Waiting for GUI to finish loading...")
+    local ready = waitForVape(10)
+    if not ready then
+        warn("[BananaVape] GUI did not fully load within timeout, continuing anyway...")
+    else
+        print("[BananaVape] GUI ready, loading game scripts...")
+    end
+
+    if not shared.VapeIndependent then
         local universalContent = downloadFile('bananavxpe/games/universal.lua')
         if universalContent then
             local universalFunc = loadstring(universalContent, 'universal')
@@ -191,7 +191,9 @@ local function initialize()
         if premiumContent then
             local premiumFunc = loadstring(premiumContent, 'premium')
             if premiumFunc then
-                pcall(function() premiumFunc(license) end)
+                task.delay(0.5, function()
+                    pcall(function() premiumFunc(license) end)
+                end)
             end
         end
     end
