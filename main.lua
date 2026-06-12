@@ -202,16 +202,18 @@ local function initialize()
             end
         end
         
-        if type(finishLoading) == "function" then
-    finishLoading()
-else
-    warn("[BananaVape] finishLoading is nil! GUI might've not loaded right...")
-    warn("[BananaVape] vape object exists:", vape ~= nil)
-end
-    else
-        vape.Init = finishLoading
-        return vape
+        print("[DEBUG] Before finishLoading")
+if type(finishLoading) == "function" then
+    print("[DEBUG] finishLoading exists, calling it...")
+    local success, err = pcall(finishLoading)
+    print("[DEBUG] finishLoading returned:", success, err)
+    if not success then
+        error("finishLoading failed: " .. tostring(err))
     end
+else
+    print("[DEBUG] finishLoading is nil!")
+end
+print("[DEBUG] After finishLoading")
 end
 
 local success, err = xpcall(initialize, function(e)
