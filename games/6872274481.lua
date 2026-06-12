@@ -1439,7 +1439,9 @@ end))
 vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
     local killed = playersService:GetPlayerFromCharacter(deathTable.entityInstance)
     if killed and killed == lplr then
-        killstreak.Value = 0
+        while killstreak.Value > 0 do
+            killstreak:Decrement()
+        end
     end
 end))
 
