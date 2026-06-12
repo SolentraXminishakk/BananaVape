@@ -10351,116 +10351,17 @@ end)
 
 run(function()
     local OldTheme
-    local connections = {}
-    local originalProperties = {}
-    local applying = false
-
-    local skipMaterials = {
-        [Enum.Material.Grass] = true,
-        [Enum.Material.LeafyGrass] = true,
-        [Enum.Material.Leaves] = true,
-        [Enum.Material.Foliage] = true,
-    }
-
-    local function degradePart(part)
-        if part:IsA("BasePart") and not originalProperties[part] then
-            originalProperties[part] = {
-                Material = part.Material,
-                CastShadow = part.CastShadow,
-                Reflectance = part.Reflectance,
-            }
-            part.CastShadow = false
-            part.Reflectance = 0
-            if not skipMaterials[part.Material] then
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-    end
-
-    local function applyPotatoGraphics()
-        local lighting = game:GetService("Lighting")
-        originalProperties.Brightness = lighting.Brightness
-        originalProperties.Ambient = lighting.Ambient
-        originalProperties.OutdoorAmbient = lighting.OutdoorAmbient
-        originalProperties.GlobalShadows = lighting.GlobalShadows
-        originalProperties.ShadowSoftness = lighting.ShadowSoftness
-
-        lighting.Brightness = 1
-        lighting.Ambient = Color3.fromRGB(128, 128, 128)
-        lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-        lighting.GlobalShadows = false
-        lighting.ShadowSoftness = 0
-
-        for _, effect in ipairs(lighting:GetChildren()) do
-            pcall(function() effect.Enabled = false end)
-        end
-
-        task.spawn(function()
-            local count = 0
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if not OldTheme.Enabled then return end
-                pcall(degradePart, obj)
-                count += 1
-                if count % 100 == 0 then
-                    task.wait()
-                end
-            end
-
-            if not OldTheme.Enabled then return end
-            table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
-                task.defer(function()
-                    pcall(degradePart, obj)
-                end)
-            end))
-        end)
-    end
-
-    local function removePotatoGraphics()
-        local lighting = game:GetService("Lighting")
-        lighting.Brightness = originalProperties.Brightness or 2
-        lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
-        lighting.OutdoorAmbient = originalProperties.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
-        lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
-        lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
-
-        for _, effect in ipairs(lighting:GetChildren()) do
-            pcall(function() effect.Enabled = true end)
-        end
-
-        for _, conn in ipairs(connections) do
-            conn:Disconnect()
-        end
-        connections = {}
-
-        task.spawn(function()
-            local count = 0
-            for part, props in pairs(originalProperties) do
-                pcall(function()
-                    if typeof(part) == "Instance" and part:IsA("BasePart") then
-                        part.Material = props.Material
-                        part.CastShadow = props.CastShadow
-                        part.Reflectance = props.Reflectance
-                    end
-                end)
-                count += 1
-                if count % 100 == 0 then
-                    task.wait()
-                end
-            end
-            originalProperties = {}
-        end)
-    end
 
     OldTheme = vape.Categories.World:CreateModule({
         Name = 'OldTheme',
         Function = function(callback)
             if callback then
-                applyPotatoGraphics()
+                game:GetService("Lighting").GlobalShadows = false
             else
-                removePotatoGraphics()
+                game:GetService("Lighting").GlobalShadows = true
             end
         end,
-        Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
+        Tooltip = 'Brings back the classic BedWars S1 Theme!'
     })
 end)
 	
