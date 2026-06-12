@@ -125,10 +125,8 @@ end
 local function waitForVape(timeout)
     local elapsed = 0
     while elapsed < timeout do
-        if shared.vape and type(shared.vape) == "table" then
-            if type(shared.vape.Uninject) == "function" then
-                return true
-            end
+        if shared.vape and shared.vape.Loaded == true then
+            return true
         end
         task.wait(0.1)
         elapsed = elapsed + 0.1
