@@ -1,4 +1,3 @@
---This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 local license = ... or {}
 local mainapi = {
 	Categories = {},
@@ -119,7 +118,7 @@ local getcustomassets = {
 	['bananavxpe/assets/new/targetstab.png'] = 'rbxassetid://14497393895',
 	['bananavxpe/assets/new/textguiicon.png'] = 'rbxassetid://14368355456',
 	['bananavxpe/assets/new/textv4.png'] = 'rbxassetid://14368357095',
-	['bananavxpe/assets/new/textvape.png'] = 'rbxassetid://95230031744214',
+	['bananavxpe/assets/new/textvape.png'] = 'rbxassetid://14368358200',
 	['bananavxpe/assets/new/utilityicon.png'] = 'rbxassetid://14368359107',
 	['bananavxpe/assets/new/vape.png'] = 'rbxassetid://14373395239',
 	['bananavxpe/assets/new/warning.png'] = 'rbxassetid://14368361552',
@@ -274,7 +273,7 @@ local function createDownloader(text)
 			mainapi.Downloader = downloader
 		end
 		pcall(function()
-			downloader.Text = 'bananavxpe is downloading: "'..text..'"'
+			downloader.Text = 'Downloading '..text
 		end)
 	end
 end
@@ -369,7 +368,7 @@ local function loadJson(path)
 	return suc and type(res) == 'table' and res or nil
 end
 
-downloadFile('bananavxpe/profiles/features.json')
+downloadFile('bananavxpe/profiles/features.json') -- im an idiot
 local newModules = loadJson('bananavxpe/profiles/features.json') or {}
 local function makeDraggable(gui, window)
 	gui.InputBegan:Connect(function(inputObj)
@@ -3592,8 +3591,8 @@ function mainapi:CreateGUI()
 			local body = httpService:JSONEncode({
 				nonce = httpService:GenerateGUID(false),
 				args = {
-					invite = {code = 'bananavape'},
-					code = 'bananavape'
+					invite = {code = 'catvape'},
+					code = 'catvape'
 				},
 				cmd = 'INVITE_BROWSER'
 			})
@@ -3615,7 +3614,7 @@ function mainapi:CreateGUI()
 
 		task.spawn(function()
 			tooltip.Text = 'Copied!'
-			setclipboard('https://discord.gg/bananavape')
+			setclipboard('https://discord.gg/catvape')
 		end)
 	end)
 	settingsbutton.MouseEnter:Connect(function()
@@ -5749,7 +5748,7 @@ function mainapi:Load(skipgui, profile)
 
 		if guipane then
 			guipane:CreateToggle({
-				Name = 'Hide bananavape button',
+				Name = 'Hide catvape button',
 				Default = hide or false,
 				Function = function(call)
 					button.BackgroundTransparency = call and 1 or 0.35
@@ -5911,7 +5910,7 @@ local scarcitybanner = Instance.new('TextLabel')
 scarcitybanner.Size = UDim2.fromScale(1, 0.02)
 scarcitybanner.Position = UDim2.fromScale(0, 0.97)
 scarcitybanner.BackgroundTransparency = 1
-scarcitybanner.Text = 'pov: u use bananavxpe and not voidskiddy🗿 - made by wintersilence, based off catvxpe'
+scarcitybanner.Text = 'Thank you for choosing catvape! join discord.gg/catvape or click the discord button to join.'
 scarcitybanner.TextScaled = true
 scarcitybanner.TextColor3 = Color3.new(1, 1, 1)
 scarcitybanner.TextStrokeTransparency = 0.5
