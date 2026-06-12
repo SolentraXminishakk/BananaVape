@@ -10350,6 +10350,121 @@ run(function()
 end)
 
 run(function()
+    local OldTheme
+    local connections = {}
+    local originalProperties = {}
+
+    local skipMaterials = {
+        [Enum.Material.Grass] = true,
+        [Enum.Material.LeafyGrass] = true,
+        [Enum.Material.Leaves] = true,
+        [Enum.Material.Foliage] = true,
+    }
+
+    local function degradePart(part)
+        if part:IsA("BasePart") and not originalProperties[part] then
+            originalProperties[part] = {
+                Material = part.Material,
+                CastShadow = part.CastShadow,
+                Reflectance = part.Reflectance,
+            }
+            part.CastShadow = false
+            part.Reflectance = 0
+            if not skipMaterials[part.Material] then
+                part.Material = Enum.Material.SmoothPlastic
+            end
+        end
+    end
+
+    local function applyPotatoGraphics()
+        local lighting = game:GetService("Lighting")
+        originalProperties.Brightness = lighting.Brightness
+        originalProperties.Ambient = lighting.Ambient
+        originalProperties.OutdoorAmbient = lighting.OutdoorAmbient
+        originalProperties.FogEnd = lighting.FogEnd
+        originalProperties.GlobalShadows = lighting.GlobalShadows
+        originalProperties.ShadowSoftness = lighting.ShadowSoftness
+
+        lighting.Brightness = 1
+        lighting.Ambient = Color3.fromRGB(128, 128, 128)
+        lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        lighting.FogEnd = 9e8
+        lighting.GlobalShadows = false
+        lighting.ShadowSoftness = 0
+
+        for _, effect in ipairs(lighting:GetChildren()) do
+            if effect:IsA("PostEffect") then
+                effect.Enabled = false
+            end
+        end
+
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+
+        local count = 0
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            degradePart(obj)
+            count += 1
+            if count % 100 == 0 then
+                task.wait()
+            end
+        end
+
+        table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
+            task.defer(degradePart, obj)
+        end))
+    end
+
+    local function removePotatoGraphics()
+        local lighting = game:GetService("Lighting")
+        lighting.Brightness = originalProperties.Brightness or 2
+        lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
+        lighting.OutdoorAmbient = originalProperties.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
+        lighting.FogEnd = originalProperties.FogEnd or 100000
+        lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
+        lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
+
+        for _, effect in ipairs(lighting:GetChildren()) do
+            if effect:IsA("PostEffect") then
+                effect.Enabled = true
+            end
+        end
+
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+
+        local count = 0
+        for part, props in pairs(originalProperties) do
+            if typeof(part) == "Instance" and part:IsA("BasePart") then
+                part.Material = props.Material
+                part.CastShadow = props.CastShadow
+                part.Reflectance = props.Reflectance
+            end
+            count += 1
+            if count % 100 == 0 then
+                task.wait()
+            end
+        end
+
+        for _, conn in ipairs(connections) do
+            conn:Disconnect()
+        end
+        connections = {}
+        originalProperties = {}
+    end
+
+    OldTheme = vape.Categories.World:CreateModule({
+        Name = 'OldTheme',
+        Function = function(callback)
+            if callback then
+                applyPotatoGraphics()
+            else
+                removePotatoGraphics()
+            end
+        end,
+        Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
+    })
+end)
+	
+run(function()
     local BedAssist
     local AimMode
     local Speed
