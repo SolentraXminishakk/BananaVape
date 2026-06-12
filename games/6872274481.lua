@@ -10381,28 +10381,24 @@ run(function()
         originalProperties.Brightness = lighting.Brightness
         originalProperties.Ambient = lighting.Ambient
         originalProperties.OutdoorAmbient = lighting.OutdoorAmbient
-        originalProperties.FogEnd = lighting.FogEnd
         originalProperties.GlobalShadows = lighting.GlobalShadows
         originalProperties.ShadowSoftness = lighting.ShadowSoftness
 
         lighting.Brightness = 1
         lighting.Ambient = Color3.fromRGB(128, 128, 128)
         lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-        lighting.FogEnd = 9e8
         lighting.GlobalShadows = false
         lighting.ShadowSoftness = 0
 
         for _, effect in ipairs(lighting:GetChildren()) do
-            if effect:IsA("PostEffect") then
+            pcall(function()
                 effect.Enabled = false
-            end
+            end)
         end
-
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 
         local count = 0
         for _, obj in ipairs(workspace:GetDescendants()) do
-            degradePart(obj)
+            pcall(degradePart, obj)
             count += 1
             if count % 100 == 0 then
                 task.wait()
@@ -10410,7 +10406,9 @@ run(function()
         end
 
         table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
-            task.defer(degradePart, obj)
+            task.defer(function()
+                pcall(degradePart, obj)
+            end)
         end))
     end
 
@@ -10419,25 +10417,24 @@ run(function()
         lighting.Brightness = originalProperties.Brightness or 2
         lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
         lighting.OutdoorAmbient = originalProperties.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
-        lighting.FogEnd = originalProperties.FogEnd or 100000
         lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
         lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
 
         for _, effect in ipairs(lighting:GetChildren()) do
-            if effect:IsA("PostEffect") then
+            pcall(function()
                 effect.Enabled = true
-            end
+            end)
         end
-
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
 
         local count = 0
         for part, props in pairs(originalProperties) do
-            if typeof(part) == "Instance" and part:IsA("BasePart") then
-                part.Material = props.Material
-                part.CastShadow = props.CastShadow
-                part.Reflectance = props.Reflectance
-            end
+            pcall(function()
+                if typeof(part) == "Instance" and part:IsA("BasePart") then
+                    part.Material = props.Material
+                    part.CastShadow = props.CastShadow
+                    part.Reflectance = props.Reflectance
+                end
+            end)
             count += 1
             if count % 100 == 0 then
                 task.wait()
@@ -10455,9 +10452,9 @@ run(function()
         Name = 'OldTheme',
         Function = function(callback)
             if callback then
-                applyPotatoGraphics()
+                pcall(applyPotatoGraphics)
             else
-                removePotatoGraphics()
+                pcall(removePotatoGraphics)
             end
         end,
         Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
