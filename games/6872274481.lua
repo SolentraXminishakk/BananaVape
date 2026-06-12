@@ -10726,7 +10726,7 @@ run(function()
     end
 
     vape.Categories.World:CreateModule({
-        Name = 'OldTheme',
+        Name = 'FPS Boost',
         Function = function(callback)
             if callback then
                 applyPotatoGraphics()
@@ -10734,7 +10734,7 @@ run(function()
                 removePotatoGraphics()
             end
         end,
-        Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
+        Tooltip = 'Makes the game ugly for FPS. Warning: very very ugly and bright'
     })
 end)
 																																
