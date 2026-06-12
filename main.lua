@@ -202,18 +202,7 @@ local function initialize()
             end
         end
         
-        print("[DEBUG] Before finishLoading")
-if type(finishLoading) == "function" then
-    print("[DEBUG] finishLoading exists, calling it...")
-    local success, err = pcall(finishLoading)
-    print("[DEBUG] finishLoading returned:", success, err)
-    if not success then
-        error("finishLoading failed: " .. tostring(err))
-    end
-else
-    print("[DEBUG] finishLoading is nil!")
-end
-print("[DEBUG] After finishLoading")
+    finishLoading()
 end
 
 local success, err = xpcall(initialize, function(e)
