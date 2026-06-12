@@ -36,7 +36,7 @@ local function downloadFile(path, func)
         
         local res = game:HttpGet(url)
         
-        if res == '404: Not Found' then
+        if res == '404: Not Found' then -- worst error in the history of errors
             error("Failed to download: " .. path)
         end
         
@@ -132,11 +132,11 @@ local function loadGameSpecificScript()
             
             local success = executeScript(res, tostring(placeId))
             if success then
-                print("[BananaVape] Downloaded and loaded game script")
+                print("[BananaVape] Downloaded and loaded script")
                 return true
             end
         else
-            print("[BananaVape] Game script not found on GitHub for PlaceId: " .. placeId)
+            print("[BananaVape] script not found for PlaceId: " .. placeId)
         end
     end
     
@@ -202,7 +202,12 @@ local function initialize()
             end
         end
         
-        finishLoading()
+        if type(finishLoading) == "function" then
+    finishLoading()
+else
+    warn("[BananaVape] finishLoading is nil! GUI might've not loaded right...")
+    warn("[BananaVape] vape object exists:", vape ~= nil)
+end
     else
         vape.Init = finishLoading
         return vape
