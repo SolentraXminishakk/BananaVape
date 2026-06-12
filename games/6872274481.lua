@@ -1444,22 +1444,22 @@ vape:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
     kills:Increment()
 
     local isFinalKill = false
-
     local killedTeam = killed:GetAttribute('Team')
+
     if killedTeam then
+        local bedExists = false
         for _, bed in collectionService:GetTagged('bed') do
-            if bed:GetAttribute('TeamId') == killedTeam and bed:GetAttribute('NoBreak') == false then
-                isFinalKill = true
+            if bed:GetAttribute('TeamId') == killedTeam and bed:GetAttribute('NoBreak') ~= true then
+                bedExists = true
                 break
             end
+        end
+        if not bedExists then
+            isFinalKill = true
         end
     end
 
     if not isFinalKill and killed:GetAttribute('Eliminated') == true then
-        isFinalKill = true
-    end
-
-    if not isFinalKill and store.matchState == 2 then
         isFinalKill = true
     end
 
