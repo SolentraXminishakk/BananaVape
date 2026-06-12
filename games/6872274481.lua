@@ -11832,19 +11832,13 @@ run(function()
     })
 end)
 
---[[
-    Inventory
-]]
-
-print("[DEBUG] Inventory category exists?", vape.Categories.Inventory ~= nil)
-
 run(function()
     local ArmorSwitch
     local Mode
     local Targets
     local Range
     
-    ArmorSwitch = vape.Categories.Inventory:CreateModule({
+    ArmorSwitch = vape.Categories.World:CreateModule({
         Name = 'Armor Switch',
         Function = function(callback)
             if callback then
@@ -11903,6 +11897,10 @@ run(function()
         end
     })
 end)
+
+--[[
+    Inventory
+]]
 
 run(function()
     local AutoBank
