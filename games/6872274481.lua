@@ -4656,39 +4656,6 @@ run(function()
         Tooltip = 'Only attacks while swinging manually'
     })
 end)
-
-run(function()
-    local AnimationDisabler
-
-    local function killAnimations()
-        local character = lplr.Character
-        if not character then return end
-        local animator = character:FindFirstChildOfClass('Animator') or 
-                        (character:FindFirstChildOfClass('Humanoid') and 
-                         character:FindFirstChildOfClass('Humanoid'):FindFirstChildOfClass('Animator'))
-        if not animator then return end
-        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-            pcall(function()
-                track:Stop(0)
-                track:Destroy()
-            end)
-        end
-    end
-
-    AnimationDisabler = vape.Categories.Blatent:CreateModule({
-        Name = 'AnimationDisabler',
-        Function = function(callback)
-            if callback then
-                killAnimations()
-                AnimationDisabler:Clean(lplr.CharacterAdded:Connect(function()
-                    task.wait()
-                    killAnimations()
-                end))
-            end
-        end,
-        Tooltip = 'Freezes and kills all animations on your character.'
-    })
-end)
 																																																			
 run(function()
     local Value
