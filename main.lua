@@ -163,7 +163,6 @@ if not shared.VapeIndependent then
 			end
 		end
 	end
-	loadstring(downloadFile('bananavxpe/libraries/premium.lua'), 'premium')(license)
 	finishLoading()
 else
 	vape.Init = finishLoading
