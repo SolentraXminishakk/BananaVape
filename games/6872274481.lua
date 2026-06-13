@@ -8959,20 +8959,58 @@ end)
 
 run(function()
     local AnimationDisabler
+    local animationConnections = {}
 
     local function killAnimations()
         local character = lplr.Character
         if not character then return end
+
         local humanoid = character:FindFirstChildOfClass('Humanoid')
-        if not humanoid then return end
-        local animator = humanoid:FindFirstChildOfClass('Animator')
-        if not animator then return end
-        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-            pcall(function()
-                track:Stop(0)
-                track:Destroy()
-            end)
+        if humanoid then
+            local animator = humanoid:FindFirstChildOfClass('Animator')
+            if animator then
+                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                    pcall(function()
+                        track:Stop(0)
+                        track:Destroy()
+                    end)
+                end
+            end
         end
+
+        for _, controller in ipairs(character:GetDescendants()) do
+            if controller:IsA('AnimationController') then
+                local animator = controller:FindFirstChildOfClass('Animator')
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        pcall(function()
+                            track:Stop(0)
+                            track:Destroy()
+                        end)
+                    end
+                end
+            end
+        end
+
+        table.insert(animationConnections, character.DescendantAdded:Connect(function(obj)
+            if obj:IsA('Animator') then
+                task.defer(function()
+                    for _, track in ipairs(obj:GetPlayingAnimationTracks()) do
+                        pcall(function()
+                            track:Stop(0)
+                            track:Destroy()
+                        end)
+                    end
+                end)
+            end
+        end))
+    end
+
+    local function clearConnections()
+        for _, conn in ipairs(animationConnections) do
+            conn:Disconnect()
+        end
+        animationConnections = {}
     end
 
     AnimationDisabler = vape.Categories.Utility:CreateModule({
@@ -8981,9 +9019,12 @@ run(function()
             if callback then
                 killAnimations()
                 AnimationDisabler:Clean(lplr.CharacterAdded:Connect(function()
+                    clearConnections()
                     task.wait()
                     killAnimations()
                 end))
+            else
+                clearConnections()
             end
         end,
         Tooltip = 'Freezes and kills all animations on your character.'
