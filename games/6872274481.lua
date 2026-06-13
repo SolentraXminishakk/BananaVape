@@ -9500,6 +9500,345 @@ run(function()
 end)
 
 run(function()
+    local SongBeats
+    local List
+    local FOV
+    local FOVValue = {}
+    local Volume
+    local alreadypicked = {}
+    local beattick = tick()
+    local oldfov, songobj, songbpm, songtween
+    
+    local function choosesong()
+        local list = List.ListEnabled
+        if #alreadypicked >= #list then 
+            table.clear(alreadypicked) 
+        end
+    
+        if #list <= 0 then
+            notif('SongBeats', 'no songs', 10)
+            SongBeats:Toggle()
+            return
+        end
+    
+        local chosensong = list[math.random(1, #list)]
+        if #list > 1 and table.find(alreadypicked, chosensong) then
+            repeat 
+                task.wait() 
+                chosensong = list[math.random(1, #list)] 
+            until not table.find(alreadypicked, chosensong) or not SongBeats.Enabled
+        end
+        if not SongBeats.Enabled then return end
+    
+        local split = chosensong:split('/')
+        if not isfile(split[1]) then
+            notif('SongBeats', 'Missing song ('..split[1]..')', 10)
+            SongBeats:Toggle()
+            return
+        end
+    
+        songobj.SoundId = assetfunction(split[1])
+        repeat task.wait() until songobj.IsLoaded or not SongBeats.Enabled
+        if SongBeats.Enabled then
+            beattick = tick() + (tonumber(split[3]) or 0)
+            songbpm = 60 / (tonumber(split[2]) or 50)
+            songobj:Play()
+        end
+    end
+    
+    SongBeats = vape.Utillity:CreateModule({
+        Name = 'Song Beats',
+        Function = function(callback)
+            if callback then
+                songobj = Instance.new('Sound')
+                songobj.Volume = Volume.Value / 100
+                songobj.Parent = workspace
+                repeat
+                    if not songobj.Playing then choosesong() end
+                    if beattick < tick() and SongBeats.Enabled and FOV.Enabled then
+                        beattick = tick() + songbpm
+                        oldfov = math.min(bedwars.FovController:getFOV() * (bedwars.SprintController.sprinting and 1.1 or 1), 120)
+                        gameCamera.FieldOfView = oldfov - FOVValue.Value
+                        songtween = tweenService:Create(gameCamera, TweenInfo.new(math.min(songbpm, 0.2), Enum.EasingStyle.Linear), {FieldOfView = oldfov})
+                        songtween:Play()
+                    end
+                    task.wait()
+                until not SongBeats.Enabled
+            else
+                if songobj then
+                    songobj:Destroy()
+                end
+                if songtween then
+                    songtween:Cancel()
+                end
+                if oldfov then
+                    gameCamera.FieldOfView = oldfov
+                end
+                table.clear(alreadypicked)
+            end
+        end,
+        Tooltip = 'Built in mp3 player'
+    })
+    List = SongBeats:CreateTextList({
+        Name = 'Songs',
+        Placeholder = 'filepath/bpm/start'
+    })
+    FOV = SongBeats:CreateToggle({
+        Name = 'Beat FOV',
+        Function = function(callback)
+            if FOVValue.Object then
+                FOVValue.Object.Visible = callback
+            end
+            if SongBeats.Enabled then
+                SongBeats:Toggle()
+                SongBeats:Toggle()
+            end
+        end,
+        Default = true
+    })
+    FOVValue = SongBeats:CreateSlider({
+        Name = 'Adjustment',
+        Min = 1,
+        Max = 30,
+        Default = 5,
+        Darker = true
+    })
+    Volume = SongBeats:CreateSlider({
+        Name = 'Volume',
+        Function = function(val)
+            if songobj then 
+                songobj.Volume = val / 100 
+            end
+        end,
+        Min = 1,
+        Max = 100,
+        Default = 100,
+        Suffix = '%'
+    })
+end)
+
+run(function()
+    local SoundChanger
+    local List
+    local soundlist = {}
+    local old
+    
+    SoundChanger = vape.Utillity:CreateModule({
+        Name = 'Sound Changer',
+        Function = function(callback)
+            if callback then
+                old = bedwars.SoundManager.playSound
+                bedwars.SoundManager.playSound = function(self, id, ...)
+                    if soundlist[id] then
+                        id = soundlist[id]
+                    end
+    
+                    return old(self, id, ...)
+                end
+            else
+                bedwars.SoundManager.playSound = old
+                old = nil
+            end
+        end,
+        Tooltip = 'Change ingame sounds to custom ones.'
+    })
+    List = SoundChanger:CreateTextList({
+        Name = 'Sounds',
+        Placeholder = '(DAMAGE_1/ben.mp3)',
+        Function = function()
+            table.clear(soundlist)
+            for _, entry in List.ListEnabled do
+                local split = entry:split('/')
+                local id = bedwars.SoundList[split[1]]
+                if id and #split > 1 then
+                    soundlist[id] = split[2]:find('rbxasset') and split[2] or isfile(split[2]) and assetfunction(split[2]) or ''
+                end
+            end
+        end
+    })
+end)
+
+run(function()
+    local TexturePacks
+    local Pack
+    
+    TexturePacks = vape.Utillity:CreateModule({
+    	Name = 'Texture Pack',
+    	Function = function(callback)
+    		if callback then
+    			loadstring(game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/TexturePacks/main/' .. Pack.Value .. '.lua'), Pack.Value)()
+    		else
+    			if getgenv().texturepack then
+    				getgenv().texturepack:Disconnect()
+    				getgenv().texturepack = nil
+    			end
+    		end
+    	end
+    })
+    
+    Pack = TexturePacks:CreateDropdown({
+    	Name = 'Pack',
+    	List = {'Acidic', 'Devourer', 'Enlightened', 'FatCat', 'Fury', 'Makima', 'Marin-Kitsawaba', 'Moon4Real', 'Nebula', 'Onyx', 'Prime', 'Simply', 'Vile', 'VioletsDreams', 'Wichtiger'},
+    })
+end)
+
+run(function()
+    if canDebug then
+        local UICleanup
+        local OpenInv
+        local KillFeed
+        local OldTabList
+        local HotbarApp = getRoactRender(require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-app']).HotbarApp.render)
+        local HotbarOpenInventory = require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-open-inventory']).HotbarOpenInventory
+        local old, new = {}, {}
+        local oldkillfeed
+    
+        vape:Clean(function()
+            for _, v in new do
+                table.clear(v)
+            end
+            for _, v in old do
+                table.clear(v)
+            end
+            table.clear(new)
+            table.clear(old)
+        end)
+    
+        local function modifyconstant(func, ind, val)
+            if not old[func] then old[func] = {} end
+            if not new[func] then new[func] = {} end
+            if not old[func][ind] then
+                local typing = type(old[func][ind])
+                if typing == 'function' or typing == 'userdata' then return end
+                old[func][ind] = debug.getconstant(func, ind)
+            end
+            if typeof(old[func][ind]) ~= typeof(val) and val ~= nil then return end
+    
+            new[func][ind] = val
+            if UICleanup.Enabled then
+                if val then
+                    debug.setconstant(func, ind, val)
+                else
+                    debug.setconstant(func, ind, old[func][ind])
+                    old[func][ind] = nil
+                end
+            end
+        end
+    
+        UICleanup = vape.Utillity:CreateModule({
+            Name = 'UI Cleanup',
+            Function = function(callback)
+                for i, v in (callback and new or old) do
+                    for i2, v2 in v do
+                        debug.setconstant(i, i2, v2)
+                    end
+                end
+                if callback then
+                    if OpenInv.Enabled then
+                        oldinvrender = HotbarOpenInventory.render
+                        HotbarOpenInventory.render = function()
+                            return bedwars.Roact.createElement('TextButton', {Visible = false}, {})
+                        end
+                    end
+    
+                    if KillFeed.Enabled then
+                        oldkillfeed = bedwars.KillFeedController.addToKillFeed
+                        bedwars.KillFeedController.addToKillFeed = function() end
+                    end
+    
+                    if OldTabList.Enabled then
+                        starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
+                    end
+                else
+                    if oldinvrender then
+                        HotbarOpenInventory.render = oldinvrender
+                        oldinvrender = nil
+                    end
+    
+                    if KillFeed.Enabled then
+                        bedwars.KillFeedController.addToKillFeed = oldkillfeed
+                        oldkillfeed = nil
+                    end
+    
+                    if OldTabList.Enabled then
+                        starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+                    end
+                end
+            end,
+            Tooltip = 'Cleans up the UI for kits & main',
+            Category = 'Hud'
+        })
+        UICleanup:CreateToggle({
+            Name = 'Resize Health',
+            Function = function(callback)
+                modifyconstant(HotbarApp, 60, callback and 1 or nil)
+                modifyconstant(debug.getupvalue(HotbarApp, 15).render, 30, callback and 1 or nil)
+                modifyconstant(debug.getupvalue(HotbarApp, 23).tweenPosition, 16, callback and 0 or nil)
+            end,
+            Default = true
+        })
+        UICleanup:CreateToggle({
+            Name = 'No Hotbar Numbers',
+            Function = function(callback)
+                local func = oldinvrender or HotbarOpenInventory.render
+                modifyconstant(debug.getupvalue(HotbarApp, 23).render, 90, callback and 0 or nil)
+                modifyconstant(func, 71, callback and 0 or nil)
+            end,
+            Default = true
+        })
+        OpenInv = UICleanup:CreateToggle({
+            Name = 'No Inventory Button',
+            Function = function(callback)
+                modifyconstant(HotbarApp, 78, callback and 0 or nil)
+                if UICleanup.Enabled then
+                    if callback then
+                        oldinvrender = HotbarOpenInventory.render
+                        HotbarOpenInventory.render = function()
+                            return bedwars.Roact.createElement('TextButton', {Visible = false}, {})
+                        end
+                    else
+                        HotbarOpenInventory.render = oldinvrender
+                        oldinvrender = nil
+                    end
+                end
+            end,
+            Default = true
+        })
+        KillFeed = UICleanup:CreateToggle({
+            Name = 'No Kill Feed',
+            Function = function(callback)
+                if UICleanup.Enabled then
+                    if callback then
+                        oldkillfeed = bedwars.KillFeedController.addToKillFeed
+                        bedwars.KillFeedController.addToKillFeed = function() end
+                    else
+                        bedwars.KillFeedController.addToKillFeed = oldkillfeed
+                        oldkillfeed = nil
+                    end
+                end
+            end,
+            Default = true
+        })
+        OldTabList = UICleanup:CreateToggle({
+            Name = 'Old Player List',
+            Function = function(callback)
+                if UICleanup.Enabled then
+                    starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, callback)
+                end
+            end,
+            Default = true
+        })
+        UICleanup:CreateToggle({
+            Name = 'Fix Queue Card',
+            Function = function(callback)
+                modifyconstant(bedwars.QueueCard.render, 15, callback and 0.1 or nil)
+            end,
+            Default = true
+        })
+    end
+end)
+
+run(function()
     local FakeLag
     local TransmissionOffset
     local Mode
@@ -17262,345 +17601,6 @@ run(function()
     local corner = Instance.new('UICorner')
     corner.CornerRadius = UDim.new(0, 4)
     corner.Parent = label
-end)
-
-run(function()
-    local SongBeats
-    local List
-    local FOV
-    local FOVValue = {}
-    local Volume
-    local alreadypicked = {}
-    local beattick = tick()
-    local oldfov, songobj, songbpm, songtween
-    
-    local function choosesong()
-        local list = List.ListEnabled
-        if #alreadypicked >= #list then 
-            table.clear(alreadypicked) 
-        end
-    
-        if #list <= 0 then
-            notif('SongBeats', 'no songs', 10)
-            SongBeats:Toggle()
-            return
-        end
-    
-        local chosensong = list[math.random(1, #list)]
-        if #list > 1 and table.find(alreadypicked, chosensong) then
-            repeat 
-                task.wait() 
-                chosensong = list[math.random(1, #list)] 
-            until not table.find(alreadypicked, chosensong) or not SongBeats.Enabled
-        end
-        if not SongBeats.Enabled then return end
-    
-        local split = chosensong:split('/')
-        if not isfile(split[1]) then
-            notif('SongBeats', 'Missing song ('..split[1]..')', 10)
-            SongBeats:Toggle()
-            return
-        end
-    
-        songobj.SoundId = assetfunction(split[1])
-        repeat task.wait() until songobj.IsLoaded or not SongBeats.Enabled
-        if SongBeats.Enabled then
-            beattick = tick() + (tonumber(split[3]) or 0)
-            songbpm = 60 / (tonumber(split[2]) or 50)
-            songobj:Play()
-        end
-    end
-    
-    SongBeats = vape.Legit:CreateModule({
-        Name = 'Song Beats',
-        Function = function(callback)
-            if callback then
-                songobj = Instance.new('Sound')
-                songobj.Volume = Volume.Value / 100
-                songobj.Parent = workspace
-                repeat
-                    if not songobj.Playing then choosesong() end
-                    if beattick < tick() and SongBeats.Enabled and FOV.Enabled then
-                        beattick = tick() + songbpm
-                        oldfov = math.min(bedwars.FovController:getFOV() * (bedwars.SprintController.sprinting and 1.1 or 1), 120)
-                        gameCamera.FieldOfView = oldfov - FOVValue.Value
-                        songtween = tweenService:Create(gameCamera, TweenInfo.new(math.min(songbpm, 0.2), Enum.EasingStyle.Linear), {FieldOfView = oldfov})
-                        songtween:Play()
-                    end
-                    task.wait()
-                until not SongBeats.Enabled
-            else
-                if songobj then
-                    songobj:Destroy()
-                end
-                if songtween then
-                    songtween:Cancel()
-                end
-                if oldfov then
-                    gameCamera.FieldOfView = oldfov
-                end
-                table.clear(alreadypicked)
-            end
-        end,
-        Tooltip = 'Built in mp3 player'
-    })
-    List = SongBeats:CreateTextList({
-        Name = 'Songs',
-        Placeholder = 'filepath/bpm/start'
-    })
-    FOV = SongBeats:CreateToggle({
-        Name = 'Beat FOV',
-        Function = function(callback)
-            if FOVValue.Object then
-                FOVValue.Object.Visible = callback
-            end
-            if SongBeats.Enabled then
-                SongBeats:Toggle()
-                SongBeats:Toggle()
-            end
-        end,
-        Default = true
-    })
-    FOVValue = SongBeats:CreateSlider({
-        Name = 'Adjustment',
-        Min = 1,
-        Max = 30,
-        Default = 5,
-        Darker = true
-    })
-    Volume = SongBeats:CreateSlider({
-        Name = 'Volume',
-        Function = function(val)
-            if songobj then 
-                songobj.Volume = val / 100 
-            end
-        end,
-        Min = 1,
-        Max = 100,
-        Default = 100,
-        Suffix = '%'
-    })
-end)
-
-run(function()
-    local SoundChanger
-    local List
-    local soundlist = {}
-    local old
-    
-    SoundChanger = vape.Legit:CreateModule({
-        Name = 'Sound Changer',
-        Function = function(callback)
-            if callback then
-                old = bedwars.SoundManager.playSound
-                bedwars.SoundManager.playSound = function(self, id, ...)
-                    if soundlist[id] then
-                        id = soundlist[id]
-                    end
-    
-                    return old(self, id, ...)
-                end
-            else
-                bedwars.SoundManager.playSound = old
-                old = nil
-            end
-        end,
-        Tooltip = 'Change ingame sounds to custom ones.'
-    })
-    List = SoundChanger:CreateTextList({
-        Name = 'Sounds',
-        Placeholder = '(DAMAGE_1/ben.mp3)',
-        Function = function()
-            table.clear(soundlist)
-            for _, entry in List.ListEnabled do
-                local split = entry:split('/')
-                local id = bedwars.SoundList[split[1]]
-                if id and #split > 1 then
-                    soundlist[id] = split[2]:find('rbxasset') and split[2] or isfile(split[2]) and assetfunction(split[2]) or ''
-                end
-            end
-        end
-    })
-end)
-
-run(function()
-    local TexturePacks
-    local Pack
-    
-    TexturePacks = vape.Legit:CreateModule({
-    	Name = 'Texture Pack',
-    	Function = function(callback)
-    		if callback then
-    			loadstring(game:HttpGet('https://raw.githubusercontent.com/MaxlaserTech/TexturePacks/main/' .. Pack.Value .. '.lua'), Pack.Value)()
-    		else
-    			if getgenv().texturepack then
-    				getgenv().texturepack:Disconnect()
-    				getgenv().texturepack = nil
-    			end
-    		end
-    	end
-    })
-    
-    Pack = TexturePacks:CreateDropdown({
-    	Name = 'Pack',
-    	List = {'Acidic', 'Devourer', 'Enlightened', 'FatCat', 'Fury', 'Makima', 'Marin-Kitsawaba', 'Moon4Real', 'Nebula', 'Onyx', 'Prime', 'Simply', 'Vile', 'VioletsDreams', 'Wichtiger'},
-    })
-end)
-
-run(function()
-    if canDebug then
-        local UICleanup
-        local OpenInv
-        local KillFeed
-        local OldTabList
-        local HotbarApp = getRoactRender(require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-app']).HotbarApp.render)
-        local HotbarOpenInventory = require(lplr.PlayerScripts.TS.controllers.global.hotbar.ui['hotbar-open-inventory']).HotbarOpenInventory
-        local old, new = {}, {}
-        local oldkillfeed
-    
-        vape:Clean(function()
-            for _, v in new do
-                table.clear(v)
-            end
-            for _, v in old do
-                table.clear(v)
-            end
-            table.clear(new)
-            table.clear(old)
-        end)
-    
-        local function modifyconstant(func, ind, val)
-            if not old[func] then old[func] = {} end
-            if not new[func] then new[func] = {} end
-            if not old[func][ind] then
-                local typing = type(old[func][ind])
-                if typing == 'function' or typing == 'userdata' then return end
-                old[func][ind] = debug.getconstant(func, ind)
-            end
-            if typeof(old[func][ind]) ~= typeof(val) and val ~= nil then return end
-    
-            new[func][ind] = val
-            if UICleanup.Enabled then
-                if val then
-                    debug.setconstant(func, ind, val)
-                else
-                    debug.setconstant(func, ind, old[func][ind])
-                    old[func][ind] = nil
-                end
-            end
-        end
-    
-        UICleanup = vape.Legit:CreateModule({
-            Name = 'UI Cleanup',
-            Function = function(callback)
-                for i, v in (callback and new or old) do
-                    for i2, v2 in v do
-                        debug.setconstant(i, i2, v2)
-                    end
-                end
-                if callback then
-                    if OpenInv.Enabled then
-                        oldinvrender = HotbarOpenInventory.render
-                        HotbarOpenInventory.render = function()
-                            return bedwars.Roact.createElement('TextButton', {Visible = false}, {})
-                        end
-                    end
-    
-                    if KillFeed.Enabled then
-                        oldkillfeed = bedwars.KillFeedController.addToKillFeed
-                        bedwars.KillFeedController.addToKillFeed = function() end
-                    end
-    
-                    if OldTabList.Enabled then
-                        starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
-                    end
-                else
-                    if oldinvrender then
-                        HotbarOpenInventory.render = oldinvrender
-                        oldinvrender = nil
-                    end
-    
-                    if KillFeed.Enabled then
-                        bedwars.KillFeedController.addToKillFeed = oldkillfeed
-                        oldkillfeed = nil
-                    end
-    
-                    if OldTabList.Enabled then
-                        starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
-                    end
-                end
-            end,
-            Tooltip = 'Cleans up the UI for kits & main',
-            Category = 'Hud'
-        })
-        UICleanup:CreateToggle({
-            Name = 'Resize Health',
-            Function = function(callback)
-                modifyconstant(HotbarApp, 60, callback and 1 or nil)
-                modifyconstant(debug.getupvalue(HotbarApp, 15).render, 30, callback and 1 or nil)
-                modifyconstant(debug.getupvalue(HotbarApp, 23).tweenPosition, 16, callback and 0 or nil)
-            end,
-            Default = true
-        })
-        UICleanup:CreateToggle({
-            Name = 'No Hotbar Numbers',
-            Function = function(callback)
-                local func = oldinvrender or HotbarOpenInventory.render
-                modifyconstant(debug.getupvalue(HotbarApp, 23).render, 90, callback and 0 or nil)
-                modifyconstant(func, 71, callback and 0 or nil)
-            end,
-            Default = true
-        })
-        OpenInv = UICleanup:CreateToggle({
-            Name = 'No Inventory Button',
-            Function = function(callback)
-                modifyconstant(HotbarApp, 78, callback and 0 or nil)
-                if UICleanup.Enabled then
-                    if callback then
-                        oldinvrender = HotbarOpenInventory.render
-                        HotbarOpenInventory.render = function()
-                            return bedwars.Roact.createElement('TextButton', {Visible = false}, {})
-                        end
-                    else
-                        HotbarOpenInventory.render = oldinvrender
-                        oldinvrender = nil
-                    end
-                end
-            end,
-            Default = true
-        })
-        KillFeed = UICleanup:CreateToggle({
-            Name = 'No Kill Feed',
-            Function = function(callback)
-                if UICleanup.Enabled then
-                    if callback then
-                        oldkillfeed = bedwars.KillFeedController.addToKillFeed
-                        bedwars.KillFeedController.addToKillFeed = function() end
-                    else
-                        bedwars.KillFeedController.addToKillFeed = oldkillfeed
-                        oldkillfeed = nil
-                    end
-                end
-            end,
-            Default = true
-        })
-        OldTabList = UICleanup:CreateToggle({
-            Name = 'Old Player List',
-            Function = function(callback)
-                if UICleanup.Enabled then
-                    starterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, callback)
-                end
-            end,
-            Default = true
-        })
-        UICleanup:CreateToggle({
-            Name = 'Fix Queue Card',
-            Function = function(callback)
-                modifyconstant(bedwars.QueueCard.render, 15, callback and 0.1 or nil)
-            end,
-            Default = true
-        })
-    end
 end)
 
 run(function()
