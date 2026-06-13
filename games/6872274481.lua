@@ -10229,7 +10229,40 @@ run(function()
         Placeholder = 'player (userid)'
     })
 end)
+																																																																																																																																																							
+run(function()
+	local joining = true
+	local leaving = true
+																																																																																																																																																									
+    PlayerNotifications = vape.Categories.Utility:CreateModule({
+        Name = 'Player Notifications',
+        Function = function(call)
+            if call then
+				if joining == true then
+                	PlayerNotifications:Clean(playersService.PlayerAdded:Connect(function(player)
+                    	vape:Notify({
+                        	Title = 'Player Notifications',
+                        	Description = player.Name .. ' Joined the game.',
+                        	Duration = 5,
+                   		})
+                	end))
+				end
 
+				if leaving == true then
+                	PlayerNotifications:Clean(playersService.PlayerRemoving:Connect(function(player)
+                    	vape:Notify({
+                        	Title = 'Player Notifications ',
+                        	Description = player.Name .. ' Left the game.',
+                        	Duration = 5,
+                    	})
+                	end))
+				end
+            end
+        end,
+        Tooltip = 'Notifies you when a player joins or leaves.',
+    })
+end)
+																																																																																																																																																								
 run(function()
     TrapDisabler = vape.Categories.Utility:CreateModule({
         Name = 'TrapDisabler',
