@@ -10348,38 +10348,6 @@ run(function()
         Tooltip = 'Automatically selects the correct tool'
     })
 end)
-
-run(function()
-    local OldTheme
-    local originalProperties = {}
-
-    OldTheme = vape.Categories.World:CreateModule({
-        Name = 'OldTheme',
-        Function = function(callback)
-            local lighting = game:GetService("Lighting")
-            if callback then
-                originalProperties.Brightness = lighting.Brightness
-                originalProperties.Ambient = lighting.Ambient
-                originalProperties.OutdoorAmbient = lighting.OutdoorAmbient
-                originalProperties.GlobalShadows = lighting.GlobalShadows
-                originalProperties.ShadowSoftness = lighting.ShadowSoftness
-
-                lighting.Brightness = 1
-                lighting.Ambient = Color3.fromRGB(128, 128, 128)
-                lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-                lighting.GlobalShadows = false
-                lighting.ShadowSoftness = 0
-            else
-                lighting.Brightness = originalProperties.Brightness or 2
-                lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
-                lighting.OutdoorAmbient = originalProperties.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
-                lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
-                lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
-            end
-        end,
-        Tooltip = 'Brings back the classic BedWars S1 Theme!'
-    })
-end)
 	
 run(function()
     local BedAssist
