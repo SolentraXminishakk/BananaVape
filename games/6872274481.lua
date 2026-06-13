@@ -4656,6 +4656,39 @@ run(function()
         Tooltip = 'Only attacks while swinging manually'
     })
 end)
+
+run(function()
+    local AnimationDisabler
+
+    local function killAnimations()
+        local character = lplr.Character
+        if not character then return end
+        local animator = character:FindFirstChildOfClass('Animator') or 
+                        (character:FindFirstChildOfClass('Humanoid') and 
+                         character:FindFirstChildOfClass('Humanoid'):FindFirstChildOfClass('Animator'))
+        if not animator then return end
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            pcall(function()
+                track:Stop(0)
+                track:Destroy()
+            end)
+        end
+    end
+
+    AnimationDisabler = vape.Categories.Blatent:CreateModule({
+        Name = 'AnimationDisabler',
+        Function = function(callback)
+            if callback then
+                killAnimations()
+                AnimationDisabler:Clean(lplr.CharacterAdded:Connect(function()
+                    task.wait()
+                    killAnimations()
+                end))
+            end
+        end,
+        Tooltip = 'Freezes and kills all animations on your character.'
+    })
+end)
 																																																			
 run(function()
     local Value
@@ -10346,101 +10379,6 @@ run(function()
             end
         end,
         Tooltip = 'Automatically selects the correct tool'
-    })
-end)
-
-run(function()
-    local OldTheme
-    local originalProperties = {}
-    local partProperties = {}
-    local connections = {}
-
-    local skipMaterials = {
-        [Enum.Material.Grass] = true,
-        [Enum.Material.LeafyGrass] = true,
-        [Enum.Material.Leaves] = true,
-        [Enum.Material.Foliage] = true,
-    }
-
-    local function degradePart(part)
-        if part:IsA("BasePart") and not partProperties[part] then
-            partProperties[part] = {
-                Material = part.Material,
-                CastShadow = part.CastShadow,
-                Reflectance = part.Reflectance,
-            }
-            part.CastShadow = false
-            part.Reflectance = 0
-            if not skipMaterials[part.Material] then
-                part.Material = Enum.Material.SmoothPlastic
-            end
-        end
-    end
-
-    local function restorePart(part, props)
-        if typeof(part) == "Instance" and part:IsA("BasePart") then
-            part.Material = props.Material
-            part.CastShadow = props.CastShadow
-            part.Reflectance = props.Reflectance
-        end
-    end
-
-    OldTheme = vape.Categories.World:CreateModule({
-        Name = 'OldTheme',
-        Function = function(callback)
-            local lighting = game:GetService("Lighting")
-            if callback then
-                originalProperties.Brightness = lighting.Brightness
-                originalProperties.Ambient = lighting.Ambient
-                originalProperties.OutdoorAmbient = lighting.OutdoorAmbient
-                originalProperties.GlobalShadows = lighting.GlobalShadows
-                originalProperties.ShadowSoftness = lighting.ShadowSoftness
-
-                lighting.Brightness = 1
-                lighting.Ambient = Color3.fromRGB(128, 128, 128)
-                lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-                lighting.GlobalShadows = false
-                lighting.ShadowSoftness = 0
-
-                task.spawn(function()
-                    local count = 0
-                    for _, obj in ipairs(workspace:GetDescendants()) do
-                        pcall(degradePart, obj)
-                        count += 1
-                        if count % 50 == 0 then
-                            task.wait()
-                        end
-                    end
-                    table.insert(connections, workspace.DescendantAdded:Connect(function(obj)
-                        task.defer(function() pcall(degradePart, obj) end)
-                    end))
-                end)
-            else
-                lighting.Brightness = originalProperties.Brightness or 2
-                lighting.Ambient = originalProperties.Ambient or Color3.fromRGB(0, 0, 0)
-                lighting.OutdoorAmbient = originalProperties.OutdoorAmbient or Color3.fromRGB(127, 127, 127)
-                lighting.GlobalShadows = originalProperties.GlobalShadows ~= nil and originalProperties.GlobalShadows or true
-                lighting.ShadowSoftness = originalProperties.ShadowSoftness or 0.2
-
-                for _, conn in ipairs(connections) do
-                    conn:Disconnect()
-                end
-                connections = {}
-	
-                task.spawn(function()
-                    local count = 0
-                    for part, props in pairs(partProperties) do
-                        pcall(restorePart, part, props)
-                        count += 1
-                        if count % 50 == 0 then
-                            task.wait()
-                        end
-                    end
-                    partProperties = {}
-                end)
-            end
-        end,
-        Tooltip = 'Brings back the classic BedWars S1 Theme! Note: Boosts FPS depending on your device.'
     })
 end)
 	
