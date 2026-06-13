@@ -9546,7 +9546,7 @@ run(function()
         end
     end
     
-    SongBeats = vape.Utillity:CreateModule({
+    SongBeats = vape.Categories.Utility:CreateModule({
         Name = 'Song Beats',
         Function = function(callback)
             if callback then
@@ -9623,7 +9623,7 @@ run(function()
     local soundlist = {}
     local old
     
-    SoundChanger = vape.Utillity:CreateModule({
+    SoundChanger = vape.Categories.Utility:CreateModule({
         Name = 'Sound Changer',
         Function = function(callback)
             if callback then
@@ -9662,7 +9662,7 @@ run(function()
     local TexturePacks
     local Pack
     
-    TexturePacks = vape.Utillity:CreateModule({
+    TexturePacks = vape.Categories.Utility:CreateModule({
     	Name = 'Texture Pack',
     	Function = function(callback)
     		if callback then
@@ -9725,7 +9725,7 @@ run(function()
             end
         end
     
-        UICleanup = vape.Utillity:CreateModule({
+        UICleanup = vape.Categories.Utility:CreateModule({
             Name = 'UI Cleanup',
             Function = function(callback)
                 for i, v in (callback and new or old) do
