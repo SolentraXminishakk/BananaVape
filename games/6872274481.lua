@@ -5037,7 +5037,7 @@ run(function()
     local old
     
     vape.Categories.Blatant:CreateModule({
-        Name = 'No Slow',
+        Name = 'No Slowdown',
         Function = function(callback)
             local modifier = bedwars.SprintController:getMovementStatusModifier()
             if callback then
@@ -10261,6 +10261,21 @@ run(function()
         end,
         Tooltip = 'Notifies you when a player joins or leaves.',
     })
+	    joiningAllowed = PlayerNotifications:CreateToggle({
+			Name = 'Joining', 
+			Default = true,
+			Function = function(callback)
+				joining = callback
+			end,
+		})
+
+		leavingAllowed = PlayerNotifications:CreateToggle({
+			Name = 'Leaving', 
+			Default = true,
+			Function = function(callback)
+				leaving = callback
+			end,
+		})
 end)
 																																																																																																																																																								
 run(function()
