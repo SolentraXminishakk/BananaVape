@@ -8982,7 +8982,7 @@ run(function()
     end
     
     AutoPlay = vape.Categories.Utility:CreateModule({
-        Name = 'Auto Play',
+        Name = 'Auto Queue',
         Function = function(callback)
             if callback then
                 AutoPlay:Clean(vapeEvents.EntityDeathEvent.Event:Connect(function(deathTable)
