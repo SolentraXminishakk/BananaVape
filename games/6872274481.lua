@@ -10207,7 +10207,7 @@ run(function()
             if call then
 				if joining == true then
                 	PlayerNotifications:Clean(playersService.PlayerAdded:Connect(function(player)
-                    	vape:Notify({
+                    	vape:CreateNotification({
                         	Title = 'Player Notifications',
                         	Description = player.Name .. ' Joined the game.',
                         	Duration = 5,
@@ -10217,7 +10217,7 @@ run(function()
 
 				if leaving == true then
                 	PlayerNotifications:Clean(playersService.PlayerRemoving:Connect(function(player)
-                    	vape:Notify({
+                    	vape:CreateNotification({
                         	Title = 'Player Notifications ',
                         	Description = player.Name .. ' Left the game.',
                         	Duration = 5,
