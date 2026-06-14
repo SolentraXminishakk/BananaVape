@@ -10977,6 +10977,308 @@ run(function()
 end)
 
 run(function()
+    local OldTheme
+    local BlockTextures = {}
+    local OriginalProperties = {}
+    local OriginalLighting = {}
+    local MaterialOverrides = {}
+    
+    local Season1Colors = {
+        Wool = {
+            White = Color3.fromRGB(242, 242, 242),
+            Red = Color3.fromRGB(255, 85, 85),
+            Green = Color3.fromRGB(85, 255, 85),
+            Blue = Color3.fromRGB(85, 85, 255),
+            Yellow = Color3.fromRGB(255, 255, 85),
+            Orange = Color3.fromRGB(255, 170, 85),
+            Purple = Color3.fromRGB(170, 85, 255),
+            Pink = Color3.fromRGB(255, 170, 170),
+            Brown = Color3.fromRGB(170, 85, 0),
+            Gray = Color3.fromRGB(170, 170, 170),
+            Lime = Color3.fromRGB(85, 255, 170),
+            Cyan = Color3.fromRGB(85, 255, 255),
+            Magenta = Color3.fromRGB(255, 85, 170)
+        },
+        Terracotta = Color3.fromRGB(161, 106, 73),
+        OakPlanks = Color3.fromRGB(188, 156, 104),
+        Stone = Color3.fromRGB(127, 127, 127),
+        Cobblestone = Color3.fromRGB(102, 102, 102),
+        Iron = Color3.fromRGB(217, 217, 217),
+        Gold = Color3.fromRGB(255, 215, 0),
+        Diamond = Color3.fromRGB(85, 255, 255),
+        Emerald = Color3.fromRGB(85, 255, 85)
+    }
+    
+    local function getSeason1GrassColor(yLevel)
+        local t = math.clamp((yLevel + 64) / 256, 0, 1)
+        local r = 85 + (t * 42)
+        local g = 128 + (t * 64)
+        local b = 64 + (t * 32)
+        return Color3.fromRGB(r, g, b)
+    end
+    
+    local function applySeason1Textures()
+        local blockTypes = {
+            "wool_white", "wool_red", "wool_green", "wool_blue",
+            "wool_yellow", "wool_orange", "wool_purple", "wool_pink",
+            "terracotta", "oak_planks", "stone_bricks", "cobblestone",
+            "iron_block", "gold_block", "diamond_block", "emerald_block"
+        }
+        
+        for _, blockName in pairs(blockTypes) do
+            local success, block = pcall(function()
+                return replicatedStorage:FindFirstChild("Assets")
+                    and replicatedStorage.Assets:FindFirstChild("Blocks")
+                    and replicatedStorage.Assets.Blocks:FindFirstChild(blockName)
+            end)
+            
+            if success and block then
+                OriginalProperties[block] = {
+                    TextureId = block.TextureId,
+                    Color = block.Color
+                }
+                
+                if blockName:match("wool") then
+                    block.Color = Season1Colors.Wool[blockName:match("wol_(.+)")] or Season1Colors.Wool.White
+                elseif blockName == "terracotta" then
+                    block.Color = Season1Colors.Terracotta
+                elseif blockName == "oak_planks" then
+                    block.Color = Season1Colors.OakPlanks
+                elseif blockName == "stone_bricks" or blockName == "cobblestone" then
+                    block.Color = Season1Colors.Stone
+                elseif blockName == "iron_block" then
+                    block.Color = Season1Colors.Iron
+                elseif blockName == "gold_block" then
+                    block.Color = Season1Colors.Gold
+                elseif blockName == "diamond_block" then
+                    block.Color = Season1Colors.Diamond
+                elseif blockName == "emerald_block" then
+                    block.Color = Season1Colors.Emerald
+                end
+                
+                block.TextureId = ""
+            end
+        end
+    end
+    
+    local function applySeason1Lighting()
+        local lighting = game:GetService("Lighting")
+        
+        OriginalLighting = {
+            Ambient = lighting.Ambient,
+            OutdoorAmbient = lighting.OutdoorAmbient,
+            Brightness = lighting.Brightness,
+            ColorShift_Top = lighting.ColorShift_Top,
+            ColorShift_Bottom = lighting.ColorShift_Bottom,
+            EnvironmentDiffuseScale = lighting.EnvironmentDiffuseScale,
+            EnvironmentSpecularScale = lighting.EnvironmentSpecularScale,
+            ExposureCompensation = lighting.ExposureCompensation,
+            Technology = lighting.Technology
+        }
+        
+        lighting.Ambient = Color3.fromRGB(128, 128, 128)
+        lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+        lighting.Brightness = 1.5
+        lighting.ColorShift_Top = Color3.fromRGB(255, 235, 200)
+        lighting.ColorShift_Bottom = Color3.fromRGB(200, 180, 150)
+        lighting.EnvironmentDiffuseScale = 0.5
+        lighting.EnvironmentSpecularScale = 0.2
+        lighting.ExposureCompensation = 0.5
+        lighting.Technology = Enum.Technology.Legacy
+        
+        for _, effect in pairs(lighting:GetChildren()) do
+            if effect:IsA("PostEffect") then
+                OriginalProperties[effect] = { Enabled = effect.Enabled }
+                effect.Enabled = false
+            end
+        end
+    end
+    
+    local function applySeason1Skybox()
+        local lighting = game:GetService("Lighting")
+        local sky = lighting:FindFirstChild("Sky")
+        
+        if not sky then
+            sky = Instance.new("Sky")
+            sky.Parent = lighting
+            OriginalProperties.Sky = nil
+        else
+            OriginalProperties.Sky = {
+                SkyboxBk = sky.SkyboxBk,
+                SkyboxDn = sky.SkyboxDn,
+                SkyboxFt = sky.SkyboxFt,
+                SkyboxLf = sky.SkyboxLf,
+                SkyboxRt = sky.SkyboxRt,
+                SkyboxUp = sky.SkyboxUp
+            }
+        end
+        
+        sky.SkyboxBk = "rbxassetid://245710263"
+        sky.SkyboxDn = "rbxassetid://245710630"
+        sky.SkyboxFt = "rbxassetid://245710380"
+        sky.SkyboxLf = "rbxassetid://245710319"
+        sky.SkyboxRt = "rbxassetid://245710230"
+        sky.SkyboxUp = "rbxassetid://245710496"
+    end
+    
+    local function applySeason1Fog()
+        local lighting = game:GetService("Lighting")
+        
+        OriginalLighting.FogEnd = lighting.FogEnd
+        OriginalLighting.FogStart = lighting.FogStart
+        OriginalLighting.FogColor = lighting.FogColor
+        
+        lighting.FogEnd = 1000
+        lighting.FogStart = 200
+        lighting.FogColor = Color3.fromRGB(200, 200, 210)
+    end
+    
+    local function revertTheme()
+        local lighting = game:GetService("Lighting")
+
+        for prop, value in pairs(OriginalLighting) do
+            pcall(function()
+                lighting[prop] = value
+            end)
+        end
+        
+        for effect, props in pairs(OriginalProperties) do
+            if effect and effect:IsA("PostEffect") then
+                pcall(function()
+                    effect.Enabled = props.Enabled
+                end)
+            end
+        end
+        
+        if OriginalProperties.Sky then
+            local sky = lighting:FindFirstChild("Sky")
+            if sky then
+                for prop, value in pairs(OriginalProperties.Sky) do
+                    pcall(function()
+                        sky[prop] = value
+                    end)
+                end
+            end
+        end
+        
+        for block, props in pairs(OriginalProperties) do
+            if block and block:IsA("Part") and props.TextureId then
+                pcall(function()
+                    block.TextureId = props.TextureId
+                    block.Color = props.Color
+                end)
+            end
+        end
+        
+        table.clear(OriginalProperties)
+        table.clear(OriginalLighting)
+        table.clear(MaterialOverrides)
+    end
+    
+    local function setupBlockListener()
+        local connection
+        
+        local function onBlockAdded(block)
+            task.wait(0.1)
+            pcall(function()
+                if block and block:IsA("BasePart") and block.Name then
+                    local blockName = block.Name:lower()
+                    
+                    if blockName:match("wool") then
+                        local colorKey = blockName:match("wool_(.+)")
+                        if colorKey and Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)] then
+                            block.Color = Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)]
+                            block.Material = Enum.Material.Plastic
+                        end
+                    elseif blockName == "terracotta" then
+                        block.Color = Season1Colors.Terracotta
+                    elseif blockName == "oak_planks" then
+                        block.Color = Season1Colors.OakPlanks
+                    elseif blockName:match("stone") then
+                        block.Color = Season1Colors.Stone
+                    end
+                    
+                    block.TextureID = ""
+                end
+            end)
+        end
+        
+        if OldTheme and OldTheme.Enabled then
+            connection = workspace.DescendantAdded:Connect(onBlockAdded)
+            OldTheme:Clean(connection)
+        end
+    end
+    
+    OldTheme = vape.Categories.World:CreateModule({
+        Name = 'Old Theme',
+        Tooltip = 'Makes your game look like the S1 Days. Note: Boosts FPS.',
+        Function = function(callback)
+            if callback then
+                task.wait(0.5)
+                
+                local success, err = pcall(function()
+                    applySeason1Lighting()
+                    applySeason1Skybox()
+                    applySeason1Fog()
+                    applySeason1Textures()
+                    setupBlockListener()
+                    
+                    for _, block in pairs(workspace:GetDescendants()) do
+                        if block:IsA("BasePart") and block.Name and block.Name:match("wool") then
+                            pcall(function()
+                                local colorKey = block.Name:match("wool_(.+)")
+                                if colorKey and Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)] then
+                                    block.Color = Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)]
+                                    block.TextureID = ""
+                                    block.Material = Enum.Material.Plastic
+                                end
+                            end)
+                        end
+                    end
+                    
+                    notif('Old Theme', 'Season 1 theme applied!', 3, 'info')
+                end)
+                
+                if not success then
+                    warn("Old Theme error:", err)
+                    notif('Old Theme', 'Failed to apply theme', 3, 'error')
+                    OldTheme:Toggle()
+                end
+            else
+                pcall(function()
+                    revertTheme()
+                    notif('Old Theme', 'Theme reverted', 2, 'info')
+                end)
+            end
+        end
+    })
+    
+    OldTheme:CreateToggle({
+        Name = 'Classic Skybox',
+        Default = true,
+        Tooltip = 'Use Season 1 skybox'
+    })
+    
+    OldTheme:CreateToggle({
+        Name = 'Classic Lighting',
+        Default = true,
+        Tooltip = 'Use Season 1 lighting (warmer, simpler)'
+    })
+    
+    OldTheme:CreateToggle({
+        Name = 'Flat Textures',
+        Default = true,
+        Tooltip = 'Remove block textures for Season 1 flat color style'
+    })
+    
+    OldTheme:CreateToggle({
+        Name = 'Classic Fog',
+        Default = true,
+        Tooltip = 'Use Season 1 fog settings'
+    })
+end)
+													
+run(function()
     local AutoTool
     local old, event
     
