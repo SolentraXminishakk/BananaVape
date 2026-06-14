@@ -818,6 +818,7 @@ run(function()
 		EmoteType = require(replicatedStorage.TS.locker.emote['emote-type']).EmoteType,
 		GamePlayer = require(replicatedStorage.TS.player['game-player']),
 		GameAnimationUtil = require(replicatedStorage.TS.animation['animation-util']).GameAnimationUtil,
+        ReportPlayer = require(lplr.PlayerScripts.TS.controllers.global.report['report-controller']).default.reportPlayer,
 		getIcon = function(item, showinv)
 			local itemmeta = bedwars.ItemMeta[item.itemType]
 			return itemmeta and showinv and itemmeta.image or ''
@@ -2114,7 +2115,7 @@ run(function()
     local old
     
     vape.Categories.Combat:CreateModule({
-        Name = 'No Click Delay',
+        Name = 'No Click Delay (NCD)',
         Function = function(callback)
             if callback then
                 old = bedwars.SwordController.isClickingTooFast
@@ -2314,6 +2315,9 @@ run(function()
     local SilentAura
     local Targets
     local Speed
+    local Smooth
+    local Accel
+    local Shake
     local Range
     local Angle
     local Mode
@@ -2399,8 +2403,15 @@ run(function()
     
     local function findAim(localcframe, ent, fps, started)
         local prog, rng = ease(math.min((tick() - started) / (1 / (Speed.Value * 0.5)), 1)), Random.new()
-        local speed = Speed.Value * prog
-        return localcframe:Lerp(CFrame.lookAt(localcframe.p, getAim(ent) + Vector3.new((rng:NextNumber() - 0.5) * 15 * fps, (rng:NextNumber() - 0.5) * 15 * fps, (rng:NextNumber() - 0.5) * 15 * fps)), speed * fps), speed
+        local accelProg = math.pow(prog, 1 / math.max(Accel.Value, 0.1))
+        local speed = Speed.Value * accelProg
+        local smoothFactor = 1 / (Smooth.Value or 8)
+        local shakeScale = Shake.Value * fps
+        return localcframe:Lerp(CFrame.lookAt(localcframe.p, getAim(ent) + Vector3.new(
+            (rng:NextNumber() - 0.5) * 15 * fps + (rng:NextNumber() - 0.5) * shakeScale,
+            (rng:NextNumber() - 0.5) * 15 * fps + (rng:NextNumber() - 0.5) * shakeScale,
+            (rng:NextNumber() - 0.5) * 15 * fps + (rng:NextNumber() - 0.5) * shakeScale
+        )), speed * fps * smoothFactor), speed
     end
     
     local box = Instance.new('BoxHandleAdornment')
@@ -2540,6 +2551,30 @@ run(function()
         Decimal = 5,
         Tooltip = 'How fast the Aura is going to aim',
     })
+    Smooth = SilentAura:CreateSlider({
+        Name = 'Smoothness',
+        Tooltip = 'How smoothly the camera eases toward the target (higher = smoother)',
+        Min = 1,
+        Max = 20,
+        Default = 8,
+        Decimal = 10,
+    })
+    Accel = SilentAura:CreateSlider({
+        Name = 'Acceleration',
+        Tooltip = 'How quickly the aim builds up speed (lower = faster ramp-up)',
+        Min = 1,
+        Max = 10,
+        Default = 5,
+        Decimal = 10,
+    })
+    Shake = SilentAura:CreateSlider({
+        Name = 'Shake',
+        Tooltip = 'Adds randomness to aim movement to look more human',
+        Min = 0,
+        Max = 10,
+        Default = 2,
+        Decimal = 10,
+    })
     SwingTime = SilentAura:CreateSlider({
         Name = 'Swing time',
         Darker = true,
@@ -2597,7 +2632,7 @@ run(function()
     LegitAura = SilentAura:CreateToggle({Name = 'Swing only'})
     SilentAim = SilentAura:CreateToggle({
         Name = 'Silent Aim',
-        Tooltip = 'Uses catvape\'s aiming technology to silently aim while looking legit',
+        Tooltip = 'Uses catvape\'s aiming technology to silently aim while looking legit || Modified by @tez_nez on discord for better cc.',
         Default = true,
         Function = function(callback)
             Area.Object.Visible = not callback
@@ -10411,6 +10446,470 @@ run(function()
             end
         end,
         Tooltip = 'Lets you stay ingame without getting kicked'
+    })
+end)
+
+run(function()
+    local detectCheatType = true
+    local showUsername = true
+    local reportToBedwars = true
+    local addReportMessage = false
+    
+    local detectSpeed = true
+    local detectFlight = true
+    local detectAutoclicker = true
+    local detectAimAssist = true
+    
+    local speedThreshold = 20
+    local flightCheckInterval = 2
+    local autoclickerThreshold = 15
+    local aimAssistAngleThreshold = 45
+    
+    local playersService = game:GetService("Players")
+    local lplr = playersService.LocalPlayer
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local runService = game:GetService("RunService")
+    
+    local bedwars = getgenv().bedwars
+    local ReportPlayer = bedwars and bedwars.ReportPlayer or nil
+    
+    local detectedCheaters = {}
+    
+    local function notif(title, text, duration, type)
+        warn(string.format("[%s] %s - %s", title, text, duration or ""))
+    end
+    
+    local function reportCheater(player, cheatType)
+        if reportToBedwars and ReportPlayer then
+            local success, err = pcall(function()
+                ReportPlayer(player.UserId, "Cheating: " .. cheatType)
+            end)
+            if not success then
+                warn("Failed to report player: " .. tostring(err))
+            end
+        end
+        
+        if not detectedCheaters[player] then
+            detectedCheaters[player] = {
+                name = player.Name,
+                userId = player.UserId,
+                offenses = {},
+                firstDetected = os.time(),
+                lastDetected = os.time()
+            }
+        end
+        
+        table.insert(detectedCheaters[player].offenses, {
+            type = cheatType,
+            time = os.time()
+        })
+        detectedCheaters[player].lastDetected = os.time()
+    end
+    
+    local currentPlayers = {}
+    
+    local function refreshPlayerList()
+        currentPlayers = {}
+        for _, v in pairs(playersService:GetPlayers()) do
+            if v ~= lplr then
+                table.insert(currentPlayers, v)
+            end
+        end
+    end
+    
+    local function isLookingAtTarget(player, target)
+        if not player or not target then return false end
+        
+        local playerChar = player.Character
+        local targetChar = target.Character
+        
+        if not playerChar or not targetChar then return false end
+        
+        local playerHead = playerChar:FindFirstChild("Head")
+        local targetHead = targetChar:FindFirstChild("Head")
+        
+        if not playerHead or not targetHead then return false end
+        
+        local lookVector = playerChar:FindFirstChild("HumanoidRootPart") and playerChar.HumanoidRootPart.CFrame.LookVector or playerHead.CFrame.LookVector
+        
+        local directionToTarget = (targetHead.Position - playerHead.Position).Unit
+        
+        local dotProduct = lookVector:Dot(directionToTarget)
+        local angle = math.deg(math.acos(math.clamp(dotProduct, -1, 1)))
+        
+        return angle
+    end
+    
+    local function detectSpeed(player)
+        if not detectSpeed then return end
+        
+        local char = player.Character
+        if not char then return end
+        
+        local humanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+        if not humanoidRootPart then return end
+        
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.SeatPart then return end
+        
+        local lastPos = humanoidRootPart.Position
+        local lastTime = tick()
+        
+        task.wait(0.5)
+        
+        return function()
+            local currentTime = tick()
+            local deltaTime = currentTime - lastTime
+            if deltaTime <= 0 then return end
+            
+            local currentPos = humanoidRootPart.Position
+            local distance = (currentPos - lastPos).Magnitude
+            local speed = distance / deltaTime
+            
+            if speed > speedThreshold then
+                local cheatName = detectCheatType and "Speed Hack" or nil
+                local notificationTitle = cheatName and (player.Name .. " is using " .. cheatName) or (player.Name .. " is Cheating!")
+                local notificationText = "Found: Speed Hack (" .. string.format("%.1f", speed) .. " studs/s)"
+                
+                notif(notificationTitle, notificationText, 3, "warning")
+                reportCheater(player, cheatName or "Speed Hack")
+            end
+            
+            lastPos = currentPos
+            lastTime = currentTime
+        end
+    end
+    
+    local function detectFlight(player)
+        if not detectFlight then return end
+        
+        local flightData = {}
+        
+        return function()
+            local char = player.Character
+            if not char then return end
+            
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            local humanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+            
+            if not humanoid or not humanoidRootPart then return end
+            
+            local isOnGround = false
+            for _, part in pairs(char:GetChildren()) do
+                if part:IsA("BasePart") then
+                    local raycastParams = RaycastParams.new()
+                    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    raycastParams.FilterDescendantsInstances = {char}
+                    
+                    local rayResult = workspace:Raycast(part.Position, Vector3.new(0, -5, 0), raycastParams)
+                    if rayResult then
+                        isOnGround = true
+                        break
+                    end
+                end
+            end
+            
+            if not isOnGround and humanoid.FloorMaterial == Enum.Material.Air then
+                flightData[player] = (flightData[player] or 0) + flightCheckInterval
+                
+                if flightData[player] > 6 then
+                    local cheatName = detectCheatType and "Fly" or nil
+                    local notificationTitle = cheatName and (player.Name .. " is using " .. cheatName) or (player.Name .. " is Cheating!")
+                    local notificationText = "Found: Fly"
+                    
+                    notif(notificationTitle, notificationText, 3, "error")
+                    reportCheater(player, cheatName or "Fly")
+                end
+            else
+                flightData[player] = 0
+            end
+        end
+    end
+    
+    local function detectAutoclicker(player)
+        if not detectAutoclicker then return end
+        
+        local clickData = {}
+        
+        return function()
+            local mockCPS = 0
+            
+            if mockCPS > autoclickerThreshold then
+                local cheatName = detectCheatType and "Autoclicker" or nil
+                local notificationTitle = cheatName and (player.Name .. " is using " .. cheatName) or (player.Name .. " is Cheating!")
+                local notificationText = "Found: Autoclicker (" .. string.format("%.1f", mockCPS) .. " CPS)"
+                
+                notif(notificationTitle, notificationText, 3, "warning")
+                reportCheater(player, cheatName or "Autoclicker")
+            end
+        end
+    end
+    
+    local function detectAimAssist(player)
+        if not detectAimAssist then return end
+        
+        local aimData = {}
+        local lastAngle = nil
+        local angleHistory = {}
+        
+        return function()
+            local char = player.Character
+            if not char then return end
+            
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if not humanoid or humanoid.Health <= 0 then return end
+            
+            local closestTarget = nil
+            local smallestAngle = 360
+            
+            for _, target in pairs(currentPlayers) do
+                if target ~= player then
+                    local angle = isLookingAtTarget(player, target)
+                    if angle and angle < smallestAngle then
+                        smallestAngle = angle
+                        closestTarget = target
+                    end
+                end
+            end
+            
+            if smallestAngle < 360 then
+                if not angleHistory[player] then
+                    angleHistory[player] = {}
+                end
+                
+                table.insert(angleHistory[player], {
+                    angle = smallestAngle,
+                    time = tick(),
+                    target = closestTarget
+                })
+                
+                while #angleHistory[player] > 10 do
+                    table.remove(angleHistory[player], 1)
+                end
+                
+                local averageAngle = 0
+                for _, data in pairs(angleHistory[player]) do
+                    averageAngle = averageAngle + data.angle
+                end
+                averageAngle = averageAngle / #angleHistory[player]
+                
+                if averageAngle < aimAssistAngleThreshold and #angleHistory[player] >= 5 then
+                    local isInCombat = false
+                    
+                    if not isInCombat then
+                        local cheatName = detectCheatType and "Aim Assist" or nil
+                        local notificationTitle = cheatName and (player.Name .. " is using " .. cheatName) or (player.Name .. " is Cheating!")
+                        local notificationText = "Found: Aim Assist (Avg Angle: " .. string.format("%.1f", averageAngle) .. "°)"
+                        
+                        notif(notificationTitle, notificationText, 3, "warning")
+                        reportCheater(player, cheatName or "Aim Assist")
+                    end
+                end
+            end
+        end
+    end
+    
+    local anticheatFunctions = {}
+    
+    local function initAnticheat()
+        refreshPlayerList()
+        
+        for _, player in pairs(currentPlayers) do
+            if not anticheatFunctions[player] then
+                anticheatFunctions[player] = {
+                    speed = detectSpeed(player),
+                    flight = detectFlight(player),
+                    autoclicker = detectAutoclicker(player),
+                    aimAssist = detectAimAssist(player)
+                }
+            end
+        end
+    end
+    
+    playersService.PlayerAdded:Connect(function(player)
+        if player ~= lplr then
+            table.insert(currentPlayers, player)
+            anticheatFunctions[player] = {
+                speed = detectSpeed(player),
+                flight = detectFlight(player),
+                autoclicker = detectAutoclicker(player),
+                aimAssist = detectAimAssist(player)
+            }
+        end
+    end)
+    
+    playersService.PlayerRemoving:Connect(function(player)
+        for i, p in pairs(currentPlayers) do
+            if p == player then
+                table.remove(currentPlayers, i)
+                anticheatFunctions[player] = nil
+                break
+            end
+        end
+    end)
+    
+    bvAC = vape.Categories.World:CreateModule({
+        Name = 'BananaVape Anticheat',
+        Function = function(callback)
+            if callback then
+                initAnticheat()
+                
+                task.spawn(function()
+                    while callback do
+                        for player, checks in pairs(anticheatFunctions) do
+                            if checks.speed then checks.speed() end
+                            if checks.flight then checks.flight() end
+                            if checks.autoclicker then checks.autoclicker() end
+                            if checks.aimAssist then checks.aimAssist() end
+                        end
+                        task.wait(1)
+                    end
+                end)
+            else
+                anticheatFunctions = {}
+                currentPlayers = {}
+            end
+        end,
+        Tooltip = 'Detects other players cheating! Includes Speed, Flight, Autoclicker, and Aim Assist detection with auto-report to Bedwars'
+    })
+    
+    SpeedSlider = bvAC:CreateSlider({
+        Name = 'Speed Threshold',
+        Min = 10,
+        Max = 50,
+        Default = 20,
+        Suffix = 'studs/s',
+        Tooltip = 'Minimum speed to flag as speed hack',
+        Function = function(value)
+            speedThreshold = value
+        end
+    })
+    
+    FlightSlider = bvAC:CreateSlider({
+        Name = 'Flight Time Threshold',
+        Min = 2,
+        Max = 15,
+        Default = 6,
+        Suffix = 'seconds',
+        Tooltip = 'Seconds of air time before flagging as fly',
+        Function = function(value)
+            flightCheckInterval = value
+        end
+    })
+    
+    AutoclickerSlider = bvAC:CreateSlider({
+        Name = 'Autoclicker CPS Threshold',
+        Min = 5,
+        Max = 30,
+        Default = 15,
+        Suffix = 'CPS',
+        Tooltip = 'Clicks per second to flag as autoclicker',
+        Function = function(value)
+            autoclickerThreshold = value
+        end
+    })
+    
+    AimAssistSlider = bvAC:CreateSlider({
+        Name = 'Aim Assist Angle Threshold',
+        Min = 10,
+        Max = 90,
+        Default = 45,
+        Suffix = 'degrees',
+        Tooltip = 'Average look angle to flag as aim assist',
+        Function = function(value)
+            aimAssistAngleThreshold = value
+        end
+    })
+    
+    DetectCheatTypeToggle = bvAC:CreateToggle({
+        Name = 'Detect Cheat Type',
+        Tooltip = 'Shows specific cheat name in notifications',
+        Default = true,
+        Function = function(value)
+            detectCheatType = value
+        end
+    })
+    
+    ShowUsernameToggle = bvAC:CreateToggle({
+        Name = 'Show Username',
+        Tooltip = 'Shows the cheaters username in notifications',
+        Default = true,
+        Function = function(value)
+            showUsername = value
+        end
+    })
+    
+    ReportToBedwarsToggle = bvAC:CreateToggle({
+        Name = 'Auto-Report to Bedwars',
+        Tooltip = 'Automatically reports cheaters to Bedwars',
+        Default = true,
+        Function = function(value)
+            reportToBedwars = value
+        end
+    })
+    
+    DetectSpeedToggle = bvAC:CreateToggle({
+        Name = 'Detect Speed Hacks',
+        Tooltip = 'Enables speed hack detection',
+        Default = true,
+        Function = function(value)
+            detectSpeed = value
+            if not callback then return end
+            refreshPlayerList()
+            for _, player in pairs(currentPlayers) do
+                if anticheatFunctions[player] then
+                    anticheatFunctions[player].speed = value and detectSpeed(player) or nil
+                end
+            end
+        end
+    })
+    
+    DetectFlightToggle = bvAC:CreateToggle({
+        Name = 'Detect Fly Hacks',
+        Tooltip = 'Enables flight hack detection',
+        Default = true,
+        Function = function(value)
+            detectFlight = value
+            if not callback then return end
+            refreshPlayerList()
+            for _, player in pairs(currentPlayers) do
+                if anticheatFunctions[player] then
+                    anticheatFunctions[player].flight = value and detectFlight(player) or nil
+                end
+            end
+        end
+    })
+    
+    DetectAutoclickerToggle = bvAC:CreateToggle({
+        Name = 'Detect Autoclicker',
+        Tooltip = 'Enables autoclicker detection',
+        Default = true,
+        Function = function(value)
+            detectAutoclicker = value
+            if not callback then return end
+            refreshPlayerList()
+            for _, player in pairs(currentPlayers) do
+                if anticheatFunctions[player] then
+                    anticheatFunctions[player].autoclicker = value and detectAutoclicker(player) or nil
+                end
+            end
+        end
+    })
+    
+    DetectAimAssistToggle = bvAC:CreateToggle({
+        Name = 'Detect Aim Assist',
+        Tooltip = 'Enables aim assist detection',
+        Default = true,
+        Function = function(value)
+            detectAimAssist = value
+            if not callback then return end
+            refreshPlayerList()
+            for _, player in pairs(currentPlayers) do
+                if anticheatFunctions[player] then
+                    anticheatFunctions[player].aimAssist = value and detectAimAssist(player) or nil
+                end
+            end
+        end
     })
 end)
 
