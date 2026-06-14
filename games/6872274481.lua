@@ -12281,9 +12281,14 @@ run(function()
     
     local function getShopNPC()
         local shop, items, upgrades, newid = nil, false, false, nil
-        if entitylib.isAlive then
-            local localPosition = entitylib.character.RootPart.Position
-            for _, v in store.shop do
+        if not entitylib or not entitylib.isAlive then return shop, items, upgrades, newid end
+        if not entitylib.character or not entitylib.character.RootPart then return shop, items, upgrades, newid end
+        
+        local localPosition = entitylib.character.RootPart.Position
+        if not localPosition then return shop, items, upgrades, newid end
+        
+        for _, v in pairs(store.shop or {}) do
+            if v and v.RootPart and v.RootPart.Position then
                 if (v.RootPart.Position - localPosition).Magnitude <= 20 then
                     shop = v.Upgrades or v.Shop or nil
                     upgrades = upgrades or v.Upgrades
@@ -12296,6 +12301,7 @@ run(function()
     end
     
     local function canBuy(item, currencytable, amount)
+        if not item then return false end
         amount = amount or 1
         if not currencytable[item.currency] then
             local currency = getItem(item.currency)
@@ -12304,83 +12310,126 @@ run(function()
         if item.ignoredByKit and table.find(item.ignoredByKit, store.equippedKit or '') then return false end
         if item.lockedByForge or item.disabled then return false end
         if item.require and item.require.teamUpgrade then
-            if (bedwars.Store:getState().Bedwars.teamUpgrades[item.require.teamUpgrade.upgradeId] or -1) < item.require.teamUpgrade.lowestTierIndex then
-                return false
+            local upgrades = bedwars.Store and bedwars.Store:getState()
+            if upgrades and upgrades.Bedwars and upgrades.Bedwars.teamUpgrades then
+                if (upgrades.Bedwars.teamUpgrades[item.require.teamUpgrade.upgradeId] or -1) < item.require.teamUpgrade.lowestTierIndex then
+                    return false
+                end
             end
         end
         return currencytable[item.currency] >= (item.price * amount)
     end
     
     local function buyItem(item, currencytable)
-        if not id then return end
-        notif('AutoBuy', 'Bought '..bedwars.ItemMeta[item.itemType].displayName, 3)
-        bedwars.Client:Get('BedwarsPurchaseItem'):CallServerAsync({
-            shopItem = item,
-            shopId = id
-        }):andThen(function(suc)
-            if suc then
-                bedwars.SoundManager:playSound(bedwars.SoundList.BEDWARS_PURCHASE_ITEM)
-                bedwars.Store:dispatch({
-                    type = 'BedwarsAddItemPurchased',
-                    itemType = item.itemType
-                })
-                bedwars.BedwarsShopController.alreadyPurchasedMap[item.itemType] = true
+        if not item or not id then return end
+        
+        local success, err = pcall(function()
+            local displayName = bedwars.ItemMeta[item.itemType] and bedwars.ItemMeta[item.itemType].displayName or item.itemType
+            notif('AutoBuy', 'Bought '..displayName, 3)
+            
+            bedwars.Client:Get('BedwarsPurchaseItem'):CallServerAsync({
+                shopItem = item,
+                shopId = id
+            }):andThen(function(suc)
+                if suc then
+                    pcall(function()
+                        bedwars.SoundManager:playSound(bedwars.SoundList.BEDWARS_PURCHASE_ITEM)
+                        bedwars.Store:dispatch({
+                            type = 'BedwarsAddItemPurchased',
+                            itemType = item.itemType
+                        })
+                        if bedwars.BedwarsShopController then
+                            bedwars.BedwarsShopController.alreadyPurchasedMap[item.itemType] = true
+                        end
+                    end)
+                end
+            end)
+            
+            if currencytable[item.currency] then
+                currencytable[item.currency] = currencytable[item.currency] - item.price
             end
         end)
-        currencytable[item.currency] -= item.price
+        
+        if not success then
+            warn("AutoBuy buyItem error:", err)
+        end
     end
     
     local function buyUpgrade(upgradeType, currencytable)
-        if not Upgrades.Enabled then return end
+        if not Upgrades or not Upgrades.Enabled then return false end
+        if not bedwars.TeamUpgradeMeta or not bedwars.Store then return false end
+        
         local upgrade = bedwars.TeamUpgradeMeta[upgradeType]
-        local currentUpgrades = bedwars.Store:getState().Bedwars.teamUpgrades[lplr:GetAttribute('Team')] or {}
+        if not upgrade then return false end
+        
+        local state = bedwars.Store:getState()
+        if not state or not state.Bedwars or not state.Bedwars.teamUpgrades then return false end
+        
+        local currentUpgrades = state.Bedwars.teamUpgrades[lplr:GetAttribute('Team')] or {}
         local currentTier = (currentUpgrades[upgradeType] or 0) + 1
         local bought = false
-    
+        
         for i = currentTier, #upgrade.tiers do
             local tier = upgrade.tiers[i]
-            if tier.availableOnlyInQueue and not table.find(tier.availableOnlyInQueue, store.queueType) then continue end
-    
+            if tier.availableOnlyInQueue and not table.find(tier.availableOnlyInQueue, store.queueType) then 
+                break
+            end
+            
             if canBuy({currency = 'diamond', price = tier.cost}, currencytable) then
-                notif('AutoBuy', 'Bought '..(upgrade.name == 'Armor' and 'Protection' or upgrade.name)..' '..i, 3)
-                bedwars.Client:Get('RequestPurchaseTeamUpgrade'):CallServerAsync(upgradeType)
-                currencytable.diamond -= tier.cost
-                bought = true
+                local success = pcall(function()
+                    notif('AutoBuy', 'Bought '..(upgrade.name == 'Armor' and 'Protection' or upgrade.name)..' '..i, 3)
+                    bedwars.Client:Get('RequestPurchaseTeamUpgrade'):CallServerAsync(upgradeType)
+                end)
+                if success then
+                    currencytable.diamond = currencytable.diamond - tier.cost
+                    bought = true
+                else
+                    break
+                end
             else
                 break
             end
         end
-    
+        
         return bought
     end
     
     local function buyTool(tool, tools, currencytable)
+        if not tool or not tools then return false end
+        
         local bought, buyable = false
-        tool = tool and table.find(tools, tool.itemType) and table.find(tools, tool.itemType) + 1 or math.huge
-    
-        for i = tool, #tools do
+        local toolIndex = table.find(tools, tool.itemType)
+        toolIndex = toolIndex and toolIndex + 1 or math.huge
+        
+        for i = toolIndex, #tools do
             local v = bedwars.Shop.getShopItem(tools[i], lplr)
-            if canBuy(v, currencytable) then
-                if SmartCheck.Enabled and bedwars.ItemMeta[tools[i]].breakBlock and i > 2 then
-                    if Armor.Enabled then
+            if v and canBuy(v, currencytable) then
+                if SmartCheck and SmartCheck.Enabled and bedwars.ItemMeta[tools[i]].breakBlock and i > 2 then
+                    if Armor and Armor.Enabled then
                         local currentarmor = store.inventory.inventory.armor[2]
                         currentarmor = currentarmor and currentarmor ~= 'empty' and currentarmor.itemType or 'none'
-                        if (table.find(armors, currentarmor) or 3) < 3 then break end
+                        if (table.find(armors, currentarmor) or 3) < 3 then 
+                            break
+                        end
                     end
-                    if Sword.Enabled then
-                        if store.tools.sword and (table.find(swords, store.tools.sword.itemType) or 2) < 2 then break end
+                    if Sword and Sword.Enabled then
+                        if store.tools.sword and (table.find(swords, store.tools.sword.itemType) or 2) < 2 then 
+                            break
+                        end
                     end
                 end
                 bought = true
                 buyable = v
             end
-            if TierCheck.Enabled and v.nextTier then break end
+            if TierCheck and TierCheck.Enabled and v and v.nextTier then 
+                break
+            end
         end
-    
+        
         if buyable then
             buyItem(buyable, currencytable)
         end
-    
+        
         return bought
     end
     
@@ -12388,262 +12437,254 @@ run(function()
         Name = 'Auto Buy',
         Function = function(callback)
             if callback then
-                repeat task.wait() until store.queueType ~= 'bedwars_test'
-                if BedwarsCheck.Enabled and not store.queueType:find('bedwars') then return end
-    
-                local lastupgrades
-                AutoBuy:Clean(vapeEvents.InventoryAmountChanged.Event:Connect(function()
-                    if (npctick - tick()) > 1 then npctick = tick() end
-                end))
-    
+                -- Safety timeout to prevent infinite loops
+                local loopCount = 0
+                local lastRun = tick()
+                
+                -- Wait for queue type with timeout
+                local timeout = tick() + 30
                 repeat
-                    local npc, shop, upgrades, newid = getShopNPC()
-                    id = newid
-                    if GUI.Enabled then
-                        if not (bedwars.AppController:isAppOpen('BedwarsItemShopApp') or bedwars.AppController:isAppOpen('TeamUpgradeApp')) then
-                            npc = nil
+                    task.wait(0.1)
+                    if tick() > timeout then
+                        warn("AutoBuy: Timeout waiting for queueType")
+                        AutoBuy:Toggle()
+                        return
+                    end
+                until store.queueType ~= 'bedwars_test' or not AutoBuy.Enabled
+                
+                if not AutoBuy.Enabled then return end
+                
+                if BedwarsCheck and BedwarsCheck.Enabled and not (store.queueType and store.queueType:find('bedwars')) then 
+                    return 
+                end
+                
+                local lastupgrades
+                
+                if vapeEvents and vapeEvents.InventoryAmountChanged then
+                    AutoBuy:Clean(vapeEvents.InventoryAmountChanged.Event:Connect(function()
+                        if (npctick - tick()) > 1 then 
+                            npctick = tick() 
                         end
-                    end
-    
-                    if npc and lastupgrades ~= upgrades then
-                        if (npctick - tick()) > 1 then npctick = tick() end
-                        lastupgrades = upgrades
-                    end
-    
-                    if npc and npctick <= tick() and store.matchState ~= 2 and store.shopLoaded then
-                        local currencytable = {}
-                        local waitcheck
-                        for _, tab in Callbacks do
-                            for _, callback in tab do
-                                if callback(currencytable, shop, upgrades) then
-                                    waitcheck = true
+                    end))
+                end
+                
+                -- Main loop with safety
+                task.spawn(function()
+                    while AutoBuy and AutoBuy.Enabled do
+                        -- Safety: break if loop runs too long without yielding properly
+                        loopCount = loopCount + 1
+                        if loopCount > 1000 then
+                            warn("AutoBuy: Loop safety triggered")
+                            AutoBuy:Toggle()
+                            break
+                        end
+                        
+                        -- Prevent too many iterations per second
+                        if tick() - lastRun < 0.05 then
+                            task.wait(0.05)
+                        end
+                        lastRun = tick()
+                        
+                        pcall(function()
+                            if not AutoBuy or not AutoBuy.Enabled then return end
+                            if not entitylib or not entitylib.isAlive then return end
+                            
+                            local npc, shop, upgrades, newid = getShopNPC()
+                            id = newid
+                            
+                            if GUI and GUI.Enabled then
+                                if not (bedwars.AppController and (bedwars.AppController:isAppOpen('BedwarsItemShopApp') or bedwars.AppController:isAppOpen('TeamUpgradeApp'))) then
+                                    npc = nil
                                 end
                             end
-                        end
-                        npctick = tick() + (waitcheck and 0.4 or math.huge)
+                            
+                            if npc and lastupgrades ~= upgrades then
+                                if (npctick - tick()) > 1 then 
+                                    npctick = tick() 
+                                end
+                                lastupgrades = upgrades
+                            end
+                            
+                            if npc and npctick <= tick() and store.matchState ~= 2 and store.shopLoaded then
+                                local currencytable = {}
+                                local waitcheck = false
+                                
+                                for _, tab in pairs(Callbacks) do
+                                    if not AutoBuy or not AutoBuy.Enabled then break end
+                                    for _, callbackFunc in pairs(tab) do
+                                        if type(callbackFunc) == 'function' then
+                                            local success, result = pcall(callbackFunc, currencytable, shop, upgrades)
+                                            if success and result then
+                                                waitcheck = true
+                                            end
+                                        end
+                                    end
+                                end
+                                
+                                npctick = tick() + (waitcheck and 0.4 or math.huge)
+                            end
+                        end)
+                        
+                        task.wait(0.1)
                     end
-    
-                    task.wait(0.1)
-                until not AutoBuy.Enabled
+                end)
             else
                 npctick = tick()
+                id = nil
             end
         end,
         Tooltip = 'Automatically buys items when you go near the shop'
     })
-    Sword = AutoBuy:CreateToggle({
-        Name = 'Buy Sword',
-        Function = function(callback)
-            npctick = tick()
-            Functions[2] = callback and function(currencytable, shop)
-                if not shop then return end
     
-                if store.equippedKit == 'dasher' then
-                    swords = {
-                        [1] = 'wood_dao',
-                        [2] = 'stone_dao',
-                        [3] = 'iron_dao',
-                        [4] = 'diamond_dao',
-                        [5] = 'emerald_dao'
-                    }
-                elseif store.equippedKit == 'ice_queen' then
-                    swords[5] = 'ice_sword'
-                elseif store.equippedKit == 'ember' then
-                    swords[5] = 'infernal_saber'
-                elseif store.equippedKit == 'lumen' then
-                    swords[5] = 'light_sword'
-                end
-    
-                return buyTool(store.tools.sword, swords, currencytable)
-            end or nil
-        end
-    })
-    Armor = AutoBuy:CreateToggle({
-        Name = 'Buy Armor',
-        Function = function(callback)
-            npctick = tick()
-            Functions[1] = callback and function(currencytable, shop)
-                if not shop then return end
-                local currentarmor = store.inventory.inventory.armor[2] ~= 'empty' and store.inventory.inventory.armor[2] or getBestArmor(1)
-                currentarmor = currentarmor and currentarmor.itemType or 'none'
-                return buyTool({itemType = currentarmor}, armors, currencytable)
-            end or nil
-        end,
-        Default = true
-    })
-    AutoBuy:CreateToggle({
-        Name = 'Buy Axe',
-        Function = function(callback)
-            npctick = tick()
-            Functions[3] = callback and function(currencytable, shop)
-                if not shop then return end
-                return buyTool(store.tools.wood or {itemType = 'none'}, axes, currencytable)
-            end or nil
-        end
-    })
-    AutoBuy:CreateToggle({
-        Name = 'Buy Pickaxe',
-        Function = function(callback)
-            npctick = tick()
-            Functions[4] = callback and function(currencytable, shop)
-                if not shop then return end
-                return buyTool(store.tools.stone, pickaxes, currencytable)
-            end or nil
-        end
-    })
-    Upgrades = AutoBuy:CreateToggle({
-        Name = 'Buy Upgrades',
-        Function = function(callback)
-            for _, v in UpgradeToggles do
-                v.Object.Visible = callback
-            end
-        end,
-        Default = true
-    })
-    local count = 0
-    for i, v in bedwars.TeamUpgradeMeta do
-        local toggleCount = count
-        table.insert(UpgradeToggles, AutoBuy:CreateToggle({
-            Name = 'Buy '..(v.name == 'Armor' and 'Protection' or v.name),
+    if AutoBuy then
+        Sword = AutoBuy:CreateToggle({
+            Name = 'Buy Sword',
             Function = function(callback)
                 npctick = tick()
-                Functions[5 + toggleCount + (v.name == 'Armor' and 20 or 0)] = callback and function(currencytable, shop, upgrades)
-                    if not upgrades then return end
-                    if v.disabledInQueue and table.find(v.disabledInQueue, store.queueType) then return end
-                    return buyUpgrade(i, currencytable)
+                Functions[2] = callback and function(currencytable, shop)
+                    if not shop then return false end
+                    
+                    if store.equippedKit == 'dasher' then
+                        swords = {
+                            [1] = 'wood_dao',
+                            [2] = 'stone_dao',
+                            [3] = 'iron_dao',
+                            [4] = 'diamond_dao',
+                            [5] = 'emerald_dao'
+                        }
+                    elseif store.equippedKit == 'ice_queen' then
+                        swords[5] = 'ice_sword'
+                    elseif store.equippedKit == 'ember' then
+                        swords[5] = 'infernal_saber'
+                    elseif store.equippedKit == 'lumen' then
+                        swords[5] = 'light_sword'
+                    end
+                    
+                    return buyTool(store.tools.sword, swords, currencytable)
+                end or nil
+            end
+        })
+        
+        Armor = AutoBuy:CreateToggle({
+            Name = 'Buy Armor',
+            Function = function(callback)
+                npctick = tick()
+                Functions[1] = callback and function(currencytable, shop)
+                    if not shop then return false end
+                    local currentarmor = store.inventory.inventory.armor[2] ~= 'empty' and store.inventory.inventory.armor[2] or getBestArmor(1)
+                    currentarmor = currentarmor and currentarmor.itemType or 'none'
+                    return buyTool({itemType = currentarmor}, armors, currencytable)
                 end or nil
             end,
-            Darker = true,
-            Default = (i == 'ARMOR' or i == 'DAMAGE')
-        }))
-        count += 1
-    end
-    TierCheck = AutoBuy:CreateToggle({Name = 'Tier Check'})
-    BedwarsCheck = AutoBuy:CreateToggle({
-        Name = 'Only Bedwars',
-        Function = function()
-            if AutoBuy.Enabled then
-                AutoBuy:Toggle()
-                AutoBuy:Toggle()
+            Default = true
+        })
+        
+        AutoBuy:CreateToggle({
+            Name = 'Buy Axe',
+            Function = function(callback)
+                npctick = tick()
+                Functions[3] = callback and function(currencytable, shop)
+                    if not shop then return false end
+                    return buyTool(store.tools.wood or {itemType = 'none'}, axes, currencytable)
+                end or nil
             end
-        end,
-        Default = true
-    })
-    GUI = AutoBuy:CreateToggle({Name = 'GUI check'})
-    SmartCheck = AutoBuy:CreateToggle({
-        Name = 'Smart check',
-        Default = true,
-        Tooltip = 'Buys iron armor before iron axe'
-    })
-    AutoBuy:CreateTextList({
-        Name = 'Item',
-        Placeholder = 'priority/item/amount/after',
-        Function = function(list)
-            table.clear(Custom)
-            table.clear(CustomPost)
-            for _, entry in list do
-                local tab = entry:split('/')
-                local ind = tonumber(tab[1])
-                if ind then
-                    (tab[4] and CustomPost or Custom)[ind] = function(currencytable, shop)
-                        if not shop then return end
-    
-                        local v = bedwars.Shop.getShopItem(tab[2], lplr)
-                        if v then
-                            local item = getItem(tab[2] == 'wool_white' and bedwars.Shop.getTeamWool(lplr:GetAttribute('Team')) or tab[2])
-                            item = (item and tonumber(tab[3]) - item.amount or tonumber(tab[3])) // v.amount
-                            if item > 0 and canBuy(v, currencytable, item) then
-                                for _ = 1, item do
-                                    buyItem(v, currencytable)
+        })
+        
+        AutoBuy:CreateToggle({
+            Name = 'Buy Pickaxe',
+            Function = function(callback)
+                npctick = tick()
+                Functions[4] = callback and function(currencytable, shop)
+                    if not shop then return false end
+                    return buyTool(store.tools.stone, pickaxes, currencytable)
+                end or nil
+            end
+        })
+        
+        Upgrades = AutoBuy:CreateToggle({
+            Name = 'Buy Upgrades',
+            Function = function(callback)
+                for _, v in pairs(UpgradeToggles) do
+                    if v and v.Object then
+                        v.Object.Visible = callback
+                    end
+                end
+            end,
+            Default = true
+        })
+        
+        local count = 0
+        if bedwars.TeamUpgradeMeta then
+            for i, v in pairs(bedwars.TeamUpgradeMeta) do
+                local toggleCount = count
+                table.insert(UpgradeToggles, AutoBuy:CreateToggle({
+                    Name = 'Buy '..(v.name == 'Armor' and 'Protection' or v.name),
+                    Function = function(callback)
+                        npctick = tick()
+                        Functions[5 + toggleCount + (v.name == 'Armor' and 20 or 0)] = callback and function(currencytable, shop, upgrades)
+                            if not upgrades then return false end
+                            if v.disabledInQueue and table.find(v.disabledInQueue, store.queueType) then return false end
+                            return buyUpgrade(i, currencytable)
+                        end or nil
+                    end,
+                    Darker = true,
+                    Default = (i == 'ARMOR' or i == 'DAMAGE')
+                }))
+                count = count + 1
+            end
+        end
+        
+        TierCheck = AutoBuy:CreateToggle({Name = 'Tier Check'})
+        BedwarsCheck = AutoBuy:CreateToggle({
+            Name = 'Only Bedwars',
+            Function = function()
+                if AutoBuy and AutoBuy.Enabled then
+                    AutoBuy:Toggle()
+                    AutoBuy:Toggle()
+                end
+            end,
+            Default = true
+        })
+        GUI = AutoBuy:CreateToggle({Name = 'GUI check'})
+        SmartCheck = AutoBuy:CreateToggle({
+            Name = 'Smart check',
+            Default = true,
+            Tooltip = 'Buys iron armor before iron axe'
+        })
+        
+        AutoBuy:CreateTextList({
+            Name = 'Item',
+            Placeholder = 'priority/item/amount/after',
+            Function = function(list)
+                table.clear(Custom)
+                table.clear(CustomPost)
+                for _, entry in pairs(list or {}) do
+                    local tab = entry:split('/')
+                    local ind = tonumber(tab[1])
+                    if ind then
+                        local targetTable = (tab[4] and CustomPost or Custom)
+                        targetTable[ind] = function(currencytable, shop)
+                            if not shop then return false end
+                            
+                            local v = bedwars.Shop.getShopItem(tab[2], lplr)
+                            if v then
+                                local itemName = tab[2] == 'wool_white' and bedwars.Shop.getTeamWool(lplr:GetAttribute('Team')) or tab[2]
+                                local item = getItem(itemName)
+                                local amountNeeded = (item and tonumber(tab[3]) - item.amount or tonumber(tab[3])) // v.amount
+                                if amountNeeded > 0 and canBuy(v, currencytable, amountNeeded) then
+                                    for _ = 1, amountNeeded do
+                                        buyItem(v, currencytable)
+                                    end
+                                    return true
                                 end
-                                return true
                             end
+                            return false
                         end
                     end
                 end
             end
-        end
-    })
-end)
-
-run(function()
-    local AutoConsume
-    local Health
-    local SpeedPotion
-    local Apple
-    local ShieldPotion
-    
-    local function consumeCheck(attribute)
-        if entitylib.isAlive then
-            if SpeedPotion.Enabled and (not attribute or attribute == 'StatusEffect_speed') then
-                local speedpotion = getItem('speed_potion')
-                if speedpotion and (not lplr.Character:GetAttribute('StatusEffect_speed')) then
-                    for _ = 1, 4 do
-                        if bedwars.Client:Get(remotes.ConsumeItem):CallServer({item = speedpotion.tool}) then break end
-                    end
-                end
-            end
-    
-            if Apple.Enabled and (not attribute or attribute:find('Health')) then
-                if (lplr.Character:GetAttribute('Health') / lplr.Character:GetAttribute('MaxHealth')) <= (Health.Value / 100) then
-                    local apple = getItem('orange') or (not lplr.Character:GetAttribute('StatusEffect_golden_apple') and getItem('golden_apple')) or getItem('apple')
-                    
-                    if apple then
-                        bedwars.Client:Get(remotes.ConsumeItem):CallServerAsync({
-                            item = apple.tool
-                        })
-                    end
-                end
-            end
-    
-            if ShieldPotion.Enabled and (not attribute or attribute:find('Shield')) then
-                if (lplr.Character:GetAttribute('Shield_POTION') or 0) == 0 then
-                    local shield = getItem('big_shield') or getItem('mini_shield')
-    
-                    if shield then
-                        bedwars.Client:Get(remotes.ConsumeItem):CallServerAsync({
-                            item = shield.tool
-                        })
-                    end
-                end
-            end
-        end
+        })
     end
-    
-    AutoConsume = vape.Categories.Inventory:CreateModule({
-        Name = 'Auto Consume',
-        Function = function(callback)
-            if callback then
-                AutoConsume:Clean(vapeEvents.InventoryAmountChanged.Event:Connect(consumeCheck))
-                AutoConsume:Clean(vapeEvents.AttributeChanged.Event:Connect(function(attribute)
-                    if attribute:find('Shield') or attribute:find('Health') or attribute == 'StatusEffect_speed' then
-                        consumeCheck(attribute)
-                    end
-                end))
-                consumeCheck()
-            end
-        end,
-        Tooltip = 'Automatically heals for you when health or shield is under threshold.'
-    })
-    Health = AutoConsume:CreateSlider({
-        Name = 'Health Percent',
-        Min = 1,
-        Max = 99,
-        Default = 70,
-        Suffix = '%'
-    })
-    SpeedPotion = AutoConsume:CreateToggle({
-        Name = 'Speed Potions',
-        Default = true
-    })
-    Apple = AutoConsume:CreateToggle({
-        Name = 'Apple',
-        Default = true
-    })
-    ShieldPotion = AutoConsume:CreateToggle({
-        Name = 'Shield Potions',
-        Default = true
-    })
 end)
 
 run(function()
