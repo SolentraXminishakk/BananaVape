@@ -11188,7 +11188,7 @@ run(function()
                         local colorKey = blockName:match("wool_(.+)")
                         if colorKey and Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)] then
                             block.Color = Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)]
-                            block.Material = Enum.Material.Plastic
+                            block.Material = Enum.Material.SmoothPlastic
                         end
                     elseif blockName == "terracotta" then
                         block.Color = Season1Colors.Terracotta
@@ -11230,7 +11230,7 @@ run(function()
                                 if colorKey and Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)] then
                                     block.Color = Season1Colors.Wool[colorKey:sub(1,1):upper()..colorKey:sub(2)]
                                     block.TextureID = ""
-                                    block.Material = Enum.Material.Plastic
+                                    block.Material = Enum.Material.SmoothPlastic
                                 end
                             end)
                         end
