@@ -10749,7 +10749,7 @@ run(function()
     end)
     
     bvAC = vape.Categories.World:CreateModule({
-        Name = 'BananaVape Anticheat',
+        Name = 'BV Anticheat',
         Function = function(callback)
             if callback then
                 initAnticheat()
