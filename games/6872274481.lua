@@ -10770,7 +10770,7 @@ run(function()
                 currentPlayers = {}
             end
         end,
-        Tooltip = 'Detects other players cheating! Includes Speed, Flight, Autoclicker, and Aim Assist detection with auto-report to Bedwars'
+        Tooltip = 'Detects other players cheating!'
     })
     
     SpeedSlider = bvAC:CreateSlider({
